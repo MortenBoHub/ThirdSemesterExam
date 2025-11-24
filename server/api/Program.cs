@@ -4,6 +4,7 @@ using api.Services;
 using Scalar.AspNetCore;
 using Sieve.Models;
 using Sieve.Services;
+using dataccess;
 
 namespace api;
 
@@ -37,13 +38,17 @@ public class Program
     public static void Main()
     {
         var builder = WebApplication.CreateBuilder();
+		var appOptions = builder.Services.AddAppOptions(builder.Configuration);
         builder.Services.AddDbContext<MyDbContext>(conf =>
         {
             conf.UseNpgsql(appOptions.DbConnectionString);
         });
+		builder.Services.AddCors();
 
         ConfigureServices(builder.Services);
         var app = builder.Build();
+
+		app.UseCors(config => config.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin().SetIsOriginAllowed(x => true));
 		/*app.MapGet("/", ([FromServices]MyDbContext dbContext) => 
 		{
 			dbContext.dødeduer.ToList();
