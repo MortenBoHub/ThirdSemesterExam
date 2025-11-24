@@ -66,3 +66,30 @@ create table dødeduer.drawnnumbers
     drawnAt         timestamp with time zone not null,
     drawnBy         text                     not null references dødeduer.admin(id)
 );
+
+-- Insert 20 years of boards with placeholders
+create extension if not exists pgcrypto;
+
+DO $$
+    DECLARE
+        start_date date := date '2025-11-24';  -- date of first board
+        years int := 20;
+        end_date date := (start_date + (years * interval '1 year'))::date - 1;
+    BEGIN
+        INSERT INTO dødeduer.boards (id, weekNumber, year, startDate, endDate, isActive, createdAt)
+        SELECT
+            gen_random_uuid()::text,
+            to_char(gs, 'IW')::int,                     -- ISO week number
+            to_char(gs, 'IYYY')::int,                   -- ISO year
+            NULL,                                       -- placeholder startDate
+            NULL,                                       -- placeholder endDate
+            false,                                      -- not active initially
+            now()
+        FROM generate_series(start_date, end_date, interval '1 week') AS gs
+        WHERE NOT EXISTS (
+            SELECT 1 FROM dødeduer.boards b
+            WHERE b.weekNumber = to_char(gs, 'IW')::int
+              AND b.year = to_char(gs, 'IYYY')::int
+        );
+    END$$;
+

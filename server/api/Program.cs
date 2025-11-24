@@ -37,9 +37,17 @@ public class Program
     public static void Main()
     {
         var builder = WebApplication.CreateBuilder();
+        builder.Services.AddDbContext<MyDbContext>(conf =>
+        {
+            conf.UseNpgsql(appOptions.DbConnectionString);
+        });
 
         ConfigureServices(builder.Services);
         var app = builder.Build();
+		/*app.MapGet("/", ([FromServices]MyDbContext dbContext) => 
+		{
+			dbContext.dødeduer.ToList();
+		});*/
         app.UseExceptionHandler(config => { });
         app.UseOpenApi();
         app.UseSwaggerUi();
