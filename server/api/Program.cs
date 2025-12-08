@@ -5,6 +5,7 @@ using Scalar.AspNetCore;
 using Sieve.Models;
 using Sieve.Services;
 using dataccess;
+using Microsoft.EntityFrameworkCore;
 
 namespace api;
 
