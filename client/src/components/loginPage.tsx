@@ -1,0 +1,121 @@
+﻿import { useState } from 'react';
+import type React from 'react';
+import { Button } from './UI/Button';
+import { Input } from './UI/Input';
+import { Card, CardContent, CardHeader, CardTitle } from './UI/Card';
+import { Lock, User } from 'lucide-react';
+
+interface LoginScreenProps {
+    // made optional so you can use <LoginPage /> without passing it yet
+    onLogin: (username: string, isAdmin: boolean) => void;
+}
+
+export default function LoginPage({ onLogin }: LoginScreenProps) {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+
+        // Simple mock authentication
+        if (!username || !password) {
+            setError('Indtast brugernavn og kodeord');
+            return;
+        }
+
+        // Mock: admin/admin for admin access, any other credentials for user access
+        if (username.toLowerCase() === 'admin' && password === 'admin') {
+            onLogin?.(username, true);
+        } else if (username && password) {
+            onLogin?.(username, false);
+        } else {
+            setError('Ugyldigt brugernavn eller kodeord');
+        }
+    };
+
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSubmit(e as any);
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-[#f5f1e8] via-[#f5f1e8] to-[#ed1c24]/10 flex items-center justify-center p-4">
+            <Card className="w-full max-w-md border-2 border-[#ed1c24]/20 shadow-2xl">
+                <CardHeader className="space-y-6 pb-8">
+                    {/* Logo placeholder */}
+                    <div className="flex justify-center">
+                        <div className="w-24 h-24 bg-gradient-to-br from-[#ed1c24] to-[#d11920] rounded-full flex items-center justify-center shadow-lg">
+                            <span className="text-white text-5xl">🎯</span>
+                        </div>
+                    </div>
+
+                    <CardTitle className="text-center text-[#ed1c24]">
+                        Døde Duer
+                    </CardTitle>
+                    <p className="text-center text-gray-600 text-sm">
+                        Log ind for at fortsætte
+                    </p>
+                </CardHeader>
+
+                <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="space-y-4">
+                            {/* Username field */}
+                            <div className="space-y-2">
+                                <label className="text-sm flex items-center space-x-2 text-gray-700">
+                                    <User size={16} className="text-[#ed1c24]" />
+                                    <span>Brugernavn</span>
+                                </label>
+                                <Input
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    onKeyPress={handleKeyPress}
+                                    placeholder="Indtast brugernavn"
+                                    className="h-12 text-lg border-2 focus:border-[#ed1c24]"
+                                    autoFocus
+                                />
+                            </div>
+
+                            {/* Password field */}
+                            <div className="space-y-2">
+                                <label className="text-sm flex items-center space-x-2 text-gray-700">
+                                    <Lock size={16} className="text-[#ed1c24]" />
+                                    <span>Kodeord</span>
+                                </label>
+                                <Input
+                                    type="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    onKeyPress={handleKeyPress}
+                                    placeholder="Indtast kodeord"
+                                    className="h-12 text-lg border-2 focus:border-[#ed1c24]"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Error message */}
+                        {error && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600 text-center">
+                                {error}
+                            </div>
+                        )}
+
+                        {/* Login button */}
+                        <Button
+                            type="submit"
+                            className="w-full h-12 bg-[#ed1c24] hover:bg-[#d11920] transition-all shadow-md hover:shadow-lg text-lg"
+                        >
+                            Log ind
+                        </Button>
+
+                        
+                    </form>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
