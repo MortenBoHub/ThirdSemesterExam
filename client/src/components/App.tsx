@@ -1,7 +1,7 @@
 import {createBrowserRouter, RouterProvider} from "react-router";
 import Home from "@components/Home.tsx";
 import {DevTools} from "jotai-devtools";
-import 'jotai-devtools/styles.css'
+//import 'jotai-devtools/styles.css'
 import {Toaster} from "react-hot-toast";
 import LoginPage from "./loginPage";
 import UserView from "./userPage";
@@ -12,49 +12,30 @@ import {useState} from "react";
 //import Auth from "@components/routes/auth/Auth.tsx";
 
     export default function App() {
-        const [isLoggedIn, setIsLoggedIn] = useState(false);
-        const [currentUsername, setCurrentUsername] = useState('');
+        const [username, setUsername] = useState<string | null>(null);
+        const [isAdmin, setIsAdmin] = useState(false);
         const [userType, setUserType] = useState<'user' | 'admin'>('user');
         const [showProfile, setShowProfile] = useState(false);
         const [showUserManagement, setShowUserManagement] = useState(false);
 
-        const handleLogin = (username: string, isAdmin: boolean) => { //mock
-            setCurrentUsername(username);
-            setUserType(isAdmin ? 'admin' : 'user');
-            setIsLoggedIn(true);
+        const handleLogin = (user: string, admin: boolean) => {
+            setUsername(user);
+            setIsAdmin(admin);
+            setUserType(admin ? 'admin' : 'user');
         };
 
         const handleLogout = () => {
-            setIsLoggedIn(false);
-            setCurrentUsername('');
-            setUserType('user');
-            setShowProfile(false);
-            setShowUserManagement(false);
+            setUsername(null);
+            setIsAdmin(false);
         };
 
         // Show login screen if not logged in
-        if (!isLoggedIn) {
+        if (!username) {
             return <LoginPage onLogin={handleLogin} />;
         }
     
     return (
         <>
-            <RouterProvider router={createBrowserRouter([
-                {
-                    path: '',
-                    element: <Home/>,
-                    children: [
-                        {
-                            path: '',
-                            element: <LoginPage />,
-                            index: true
-                        },
-                    //     here you can just make more components: i just have a a single auth page with a quick crud test
-                        
-                    ]
-                    
-                }
-            ])}/>
             <div className="min-h-screen bg-[#f5f1e8]">
                 {/* Navigation */}
                 <nav className="bg-white border-b-2 border-[#ed1c24] shadow-sm">
