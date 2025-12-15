@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import type React from 'react';
 import {
     X,
@@ -26,6 +26,10 @@ import {
     DialogDescription,
     DialogFooter,
 } from './UI/Dialog';
+import { authApi } from '@utilities/authApi.ts';
+import { playersApi } from '@utilities/playersApi.ts';
+import toast from 'react-hot-toast';
+import { fundRequestsApi } from '@utilities/fundRequestsApi.ts';
 
 interface ProfileModalProps {
     isAdmin: boolean;
@@ -35,15 +39,16 @@ interface ProfileModalProps {
 }
 
 interface FundRequest {
-    id: number;
+    id: string; // backend id
     amount: number;
     transactionNumber: string;
     status: 'pending' | 'approved' | 'denied';
-    date: string;
+    date: string; // createdAt
 }
 
 interface User {
-    id: number;
+    id: number; // local list id
+    backendId?: string; // real player id from API
     name: string;
     email: string;
     phone: string;
@@ -67,161 +72,226 @@ export default function ProfileModal({
     const [creatingUser, setCreatingUser] = useState(false);
     const [editingUserFunds, setEditingUserFunds] = useState<User | null>(null);
 
-    // Mock current user
-    const currentUser = {
-        name: 'Anders Nielsen',
-        email: 'anders@email.dk',
-        phone: '+45 12 34 56 78',
-        funds: 240,
-    };
+    const [currentUser, setCurrentUser] = useState<{ id?: string; name: string; email: string; phone?: string; funds?: number }>({
+        name: '-',
+        email: '-',
+        phone: '',
+        funds: 0,
+    });
 
-    // Mock users list (for admin)
-    const [users, setUsers] = useState<User[]>([
-        {
-            id: 1,
-            name: 'Anders Nielsen',
-            email: 'anders@email.dk',
-            phone: '+45 12 34 56 78',
-            funds: 240,
-            isDeleted: false,
-            fundsRequests: [],
-        },
-        {
-            id: 2,
-            name: 'Maria Jensen',
-            email: 'maria@email.dk',
-            phone: '+45 23 45 67 89',
-            funds: 160,
-            isDeleted: false,
-            fundsRequests: [
-                {
-                    id: 1,
-                    amount: 200,
-                    transactionNumber: 'TXN123456',
-                    status: 'pending',
-                    date: '17.11.2024',
-                },
-            ],
-        },
-        {
-            id: 3,
-            name: 'Peter Hansen',
-            email: 'peter@email.dk',
-            phone: '+45 34 56 78 90',
-            funds: 320,
-            isDeleted: false,
-            fundsRequests: [],
-        },
-        {
-            id: 4,
-            name: 'Laura Andersen',
-            email: 'laura@email.dk',
-            phone: '+45 45 67 89 01',
-            funds: 80,
-            isDeleted: false,
-            fundsRequests: [
-                {
-                    id: 2,
-                    amount: 150,
-                    transactionNumber: 'TXN789012',
-                    status: 'pending',
-                    date: '16.11.2024',
-                },
-                {
-                    id: 3,
-                    amount: 100,
-                    transactionNumber: 'TXN345678',
-                    status: 'approved',
-                    date: '10.11.2024',
-                },
-            ],
-        },
-        {
-            id: 5,
-            name: 'Thomas Larsen',
-            email: 'thomas@email.dk',
-            phone: '+45 56 78 90 12',
-            funds: 0,
-            isDeleted: false,
-            fundsRequests: [
-                {
-                    id: 4,
-                    amount: 300,
-                    transactionNumber: 'TXN901234',
-                    status: 'pending',
-                    date: '15.11.2024',
-                },
-            ],
-        },
-    ]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+
+    useEffect(() => {
+        const load = async () => {
+            setLoading(true);
+            try {
+                const me = await authApi.whoAmI();
+                if (me && me.id) {
+                    try {
+                        const player = await playersApi.getPlayer(me.id);
+                        setCurrentUser({
+                            id: me.id,
+                            name: player.name ?? '-',
+                            email: player.email ?? me.email ?? '-',
+                            phone: player.phonenumber ?? '',
+                            funds: player.funds ?? 0,
+                        });
+                    } catch (e:any) {
+                        setCurrentUser({ id: me.id, name: me.email ?? '-', email: me.email ?? '-' });
+                    }
+                }
+
+                if (isAdmin) {
+                    const list = await playersApi.getPlayers();
+                    const mappedUsers: User[] = (list as any[]).map((p, idx) => ({
+                        id: idx + 1,
+                        backendId: p.id,
+                        name: p.name ?? '-',
+                        email: p.email ?? '-',
+                        phone: p.phonenumber ?? '',
+                        funds: p.funds ?? 0,
+                        isDeleted: p.isdeleted ?? false,
+                        fundsRequests: [],
+                    }));
+
+                    // Load pending fund requests and attach to users
+                    try {
+                        const pending = await fundRequestsApi.list('pending');
+                        const byPlayer: Record<string, FundRequest[]> = {};
+                        (pending as any[]).forEach(fr => {
+                            const r: FundRequest = {
+                                id: fr.id,
+                                amount: fr.amount ?? 0,
+                                transactionNumber: fr.transactionnumber ?? fr.transactionNumber ?? '',
+                                status: (fr.status ?? 'pending') as 'pending'|'approved'|'denied',
+                                date: fr.createdat ?? fr.createdAt ?? new Date().toISOString(),
+                            };
+                            const pid: string = fr.playerid ?? fr.playerId;
+                            if (!byPlayer[pid]) byPlayer[pid] = [];
+                            byPlayer[pid].push(r);
+                        });
+                        // Sort each player's requests by oldest first (createdAt ascending)
+                        Object.keys(byPlayer).forEach(pid => {
+                            byPlayer[pid].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                        });
+                        mappedUsers.forEach(u => {
+                            if (u.backendId && byPlayer[u.backendId]) {
+                                u.fundsRequests = byPlayer[u.backendId];
+                            }
+                        });
+                        // Sort users by oldest pending request date (ascending). Users without pending requests come after.
+                        mappedUsers.sort((a, b) => {
+                            const aPending = a.fundsRequests.filter(r => r.status === 'pending');
+                            const bPending = b.fundsRequests.filter(r => r.status === 'pending');
+                            const aDate = aPending.length > 0 ? new Date(aPending[0].date).getTime() : Number.POSITIVE_INFINITY;
+                            const bDate = bPending.length > 0 ? new Date(bPending[0].date).getTime() : Number.POSITIVE_INFINITY;
+                            return aDate - bDate; // oldest first
+                        });
+                    } catch { /* ignore pending load errors here */ }
+
+                    setUsers(mappedUsers);
+                }
+            } catch (e:any) {
+                toast.error(e?.message ?? 'Kunne ikke hente profil data');
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAdmin]);
 
     const handleRequestFunds = () => {
         setShowFundRequestDialog(true);
     };
 
-    const submitFundRequest = () => {
-        if (fundAmount && transactionNumber && transactionNumber.length <= 20) {
+    const submitFundRequest = async () => {
+        const amountNum = parseFloat(fundAmount);
+        if (!(amountNum > 0)) {
+            toast.error('Beløb skal være større end 0');
+            return;
+        }
+        if (!transactionNumber.trim()) {
+            toast.error('Transaktionsnummer er påkrævet');
+            return;
+        }
+        try {
             setFundRequestSubmitted(true);
-            setTimeout(() => {
-                setFundRequestSubmitted(false);
-                setShowFundRequestDialog(false);
-                setFundAmount('');
-                setTransactionNumber('');
-            }, 2000);
+            await fundRequestsApi.create({ amount: amountNum, transactionNumber: transactionNumber.trim() });
+            toast.success('Anmodning sendt');
+            setShowFundRequestDialog(false);
+            setFundAmount('');
+            setTransactionNumber('');
+        } catch (e:any) {
+            toast.error(e?.message ?? 'Kunne ikke sende anmodning');
+        } finally {
+            setFundRequestSubmitted(false);
         }
     };
 
-    const handleSoftDelete = (userId: number) => {
-        setUsers(users.map((u) => (u.id === userId ? { ...u, isDeleted: true } : u)));
+    const handleSoftDelete = async (userId: number) => {
+        try {
+            const user = users.find(u => u.id === userId);
+            if (!user || !user.backendId) throw new Error('Ukendt bruger');
+            await playersApi.softDelete(user.backendId);
+            setUsers(users.map((u) => (u.id === userId ? { ...u, isDeleted: true } : u)));
+            toast.success('Bruger deaktiveret');
+        } catch (e:any) {
+            toast.error(e?.message ?? 'Kunne ikke deaktivere bruger');
+        }
     };
 
-    const handleRestore = (userId: number) => {
-        setUsers(users.map((u) => (u.id === userId ? { ...u, isDeleted: false } : u)));
+    const handleRestore = async (userId: number) => {
+        try {
+            const user = users.find(u => u.id === userId);
+            if (!user || !user.backendId) throw new Error('Ukendt bruger');
+            await playersApi.restore(user.backendId);
+            setUsers(users.map((u) => (u.id === userId ? { ...u, isDeleted: false } : u)));
+            toast.success('Bruger gendannet');
+        } catch (e:any) {
+            toast.error(e?.message ?? 'Kunne ikke gendanne bruger');
+        }
     };
 
-    const handleUpdateUser = (updatedUser: User) => {
-        setUsers(users.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-        setEditingUser(null);
+    const handleUpdateUser = async (updatedUser: User) => {
+        try {
+            if (!updatedUser.backendId) throw new Error('Ukendt bruger');
+            await playersApi.updatePlayer(updatedUser.backendId, {
+                name: updatedUser.name,
+                email: updatedUser.email,
+                phonenumber: updatedUser.phone,
+            });
+            setUsers(users.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+            setEditingUser(null);
+            toast.success('Bruger opdateret');
+        } catch (e:any) {
+            toast.error(e?.message ?? 'Kunne ikke opdatere bruger');
+        }
     };
 
-    const handleCreateUser = (newUser: Omit<User, 'id'>) => {
-        const id = Math.max(...users.map((u) => u.id)) + 1;
-        setUsers([...users, { ...newUser, id }]);
-        setCreatingUser(false);
+    const handleCreateUser = async (newUser: Omit<User, 'id'>) => {
+        try {
+            // Map to API DTO
+            const created = await playersApi.createPlayer({
+                name: newUser.name,
+                email: newUser.email,
+                phoneNumber: newUser.phone,
+                password: 'changeme123', // Temporary default; could prompt in UI
+            });
+            const id = (users.map((u) => u.id).length > 0 ? Math.max(...users.map((u) => u.id)) : 0) + 1;
+            const userToAdd: User = {
+                id,
+                backendId: created.id,
+                name: created.name ?? newUser.name,
+                email: created.email ?? newUser.email,
+                phone: created.phonenumber ?? newUser.phone,
+                funds: created.funds ?? 0,
+                isDeleted: created.isdeleted ?? false,
+                fundsRequests: [],
+            };
+            setUsers([...users, userToAdd]);
+            setCreatingUser(false);
+            toast.success('Bruger oprettet');
+        } catch (e:any) {
+            toast.error(e?.message ?? 'Kunne ikke oprette bruger');
+        }
     };
 
-    const handleApproveFundRequest = (userId: number, requestId: number) => {
-        setUsers(
-            users.map((u) => {
-                if (u.id !== userId) return u;
-
-                const request = u.fundsRequests.find((r) => r.id === requestId);
-                if (request && request.status === 'pending') {
-                    return {
-                        ...u,
-                        funds: u.funds + request.amount,
-                        fundsRequests: u.fundsRequests.map((r) =>
-                            r.id === requestId ? { ...r, status: 'approved' as const } : r,
-                        ),
-                    };
-                }
-                return u;
-            }),
-        );
-    };
-
-    const handleDenyFundRequest = (userId: number, requestId: number) => {
-        setUsers(
-            users.map((u) => {
+    const handleApproveFundRequest = async (userId: number, requestId: string) => {
+        try {
+            const user = users.find(u => u.id === userId);
+            const req = user?.fundsRequests.find(r => r.id === requestId);
+            if (!req) throw new Error('Ukendt anmodning');
+            await fundRequestsApi.approve(requestId);
+            setUsers(users.map(u => {
                 if (u.id !== userId) return u;
                 return {
                     ...u,
-                    fundsRequests: u.fundsRequests.map((r) =>
-                        r.id === requestId ? { ...r, status: 'denied' as const } : r,
-                    ),
+                    funds: u.funds + req.amount,
+                    fundsRequests: u.fundsRequests.map(r => r.id === requestId ? { ...r, status: 'approved' } : r)
                 };
-            }),
-        );
+            }));
+            toast.success('Anmodning godkendt');
+        } catch (e:any) {
+            toast.error(e?.message ?? 'Kunne ikke godkende anmodning');
+        }
+    };
+
+    const handleDenyFundRequest = async (userId: number, requestId: string) => {
+        try {
+            await fundRequestsApi.deny(requestId);
+            setUsers(users.map(u => {
+                if (u.id !== userId) return u;
+                return {
+                    ...u,
+                    fundsRequests: u.fundsRequests.map(r => r.id === requestId ? { ...r, status: 'denied' } : r)
+                };
+            }));
+            toast.success('Anmodning afvist');
+        } catch (e:any) {
+            toast.error(e?.message ?? 'Kunne ikke afvise anmodning');
+        }
     };
 
     const pendingRequestsCount = users.reduce(
@@ -525,6 +595,37 @@ export default function ProfileModal({
                             user={currentUser}
                             isAdmin={isAdmin}
                             onRequestFunds={handleRequestFunds}
+                            onSave={async (vals) => {
+                                try {
+                                    if (!currentUser.id) throw new Error('Ingen bruger-id fundet');
+                                    // Update email/phone if changed
+                                    const upd: any = {};
+                                    if (vals.email && vals.email !== currentUser.email) upd.email = vals.email;
+                                    if (vals.phone && vals.phone !== currentUser.phone) upd.phonenumber = vals.phone;
+                                    if (Object.keys(upd).length > 0) {
+                                        await playersApi.updatePlayer(currentUser.id, upd);
+                                    }
+
+                                    // Change password if provided
+                                    if (vals.currentPassword && vals.newPassword) {
+                                        await playersApi.changePassword(currentUser.id, vals.currentPassword, vals.newPassword);
+                                    }
+
+                                    // Refresh me
+                                    try {
+                                        const player = await playersApi.getPlayer(currentUser.id);
+                                        setCurrentUser((prev) => ({
+                                            ...prev,
+                                            email: player.email ?? prev.email,
+                                            phone: player.phonenumber ?? prev.phone,
+                                        }));
+                                    } catch {}
+
+                                    toast.success('Ændringer gemt');
+                                } catch (e:any) {
+                                    toast.error(e?.message ?? 'Kunne ikke gemme ændringer');
+                                }
+                            }}
                         />
                     )}
                 </div>
@@ -639,11 +740,57 @@ function ProfileInfoTab({
                             user,
                             isAdmin,
                             onRequestFunds,
+                            onSave,
                         }: {
-    user: { name: string; email: string; phone: string; funds: number };
+    user: { name: string; email: string; phone?: string; funds?: number };
     isAdmin: boolean;
     onRequestFunds: () => void;
+    onSave: (vals: { email?: string; phone?: string; currentPassword?: string; newPassword?: string }) => Promise<void> | void;
 }) {
+    const [email, setEmail] = useState(user.email ?? '');
+    const [phone, setPhone] = useState(user.phone ?? '');
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        setEmail(user.email ?? '');
+        setPhone(user.phone ?? '');
+    }, [user.email, user.phone]);
+
+    const handleSave = async () => {
+        if (newPassword || confirmPassword || currentPassword) {
+            if (!currentPassword) {
+                toast.error('Angiv nuværende kodeord');
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                toast.error('Kodeord stemmer ikke overens');
+                return;
+            }
+            if (newPassword.length < 6) {
+                toast.error('Nyt kodeord skal være mindst 6 tegn');
+                return;
+            }
+        }
+
+        setSaving(true);
+        try {
+            await onSave({
+                email,
+                phone,
+                currentPassword: currentPassword || undefined,
+                newPassword: newPassword || undefined,
+            });
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Funds Card */}
@@ -658,7 +805,7 @@ function ProfileInfoTab({
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <p className="text-sm text-gray-600">Nuværende saldo</p>
-                            <p className="text-[#ed1c24]">{user.funds} kr</p>
+                            <p className="text-[#ed1c24]">{user.funds ?? 0} kr</p>
                         </div>
                     </div>
                     <Button
@@ -681,30 +828,37 @@ function ProfileInfoTab({
                             <Mail size={16} className="text-gray-500" />
                             <span>Email</span>
                         </label>
-                        <Input defaultValue={user.email} />
+                        <Input value={email} onChange={(e) => setEmail(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm flex items-center space-x-2">
                             <Phone size={16} className="text-gray-500" />
                             <span>Telefon</span>
                         </label>
-                        <Input defaultValue={user.phone} />
+                        <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm flex items-center space-x-2">
+                            <Lock size={16} className="text-gray-500" />
+                            <span>Nuværende kodeord</span>
+                        </label>
+                        <Input type="password" placeholder="••••••••" value={currentPassword} onChange={(e)=>setCurrentPassword(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm flex items-center space-x-2">
                             <Lock size={16} className="text-gray-500" />
                             <span>Nyt kodeord</span>
                         </label>
-                        <Input type="password" placeholder="••••••••" />
+                        <Input type="password" placeholder="••••••••" value={newPassword} onChange={(e)=>setNewPassword(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm flex items-center space-x-2">
                             <Lock size={16} className="text-gray-500" />
                             <span>Bekræft nyt kodeord</span>
                         </label>
-                        <Input type="password" placeholder="••••••••" />
+                        <Input type="password" placeholder="••••••••" value={confirmPassword} onChange={(e)=>setConfirmPassword(e.target.value)} />
                     </div>
-                    <Button className="w-full bg-[#ed1c24] hover:bg-[#d11920] text-white py-2 rounded">
+                    <Button onClick={handleSave} disabled={saving} className="w-full bg-[#ed1c24] hover:bg-[#d11920] text-white py-2 rounded">
                         Gem ændringer
                     </Button>
                 </CardContent>

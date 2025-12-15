@@ -22,4 +22,6 @@ public partial class Player
     public bool Isdeleted { get; set; }
 
     public virtual ICollection<Playerboard> Playerboards { get; set; } = new List<Playerboard>();
+
+    public virtual ICollection<Fundrequest> Fundrequests { get; set; } = new List<Fundrequest>();
 }

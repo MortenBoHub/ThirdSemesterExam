@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useEffect, useState } from "react";
 import type React from "react";
 
 import { Card, CardHeader, CardTitle, CardContent } from "./UI/Card";
@@ -8,10 +8,24 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./UI/Tabs";
 import { Badge } from "./UI/Badge";
 
 import { Users, Trophy, History } from "lucide-react";
+import { playersApi } from "@utilities/playersApi.ts";
+import { boardsApi } from "@utilities/boardsApi.ts";
+import toast from "react-hot-toast";
 
 export default function AdminPage() {
     const [drawnNumbers, setDrawnNumbers] = useState<number[]>([]);
+    const [participants, setParticipants] = useState<{name: string; email: string; numbers: number[]; matches: number;}[]>([]);
+    const [gameHistory, setGameHistory] = useState<{id: string; week: string; date: string; numbers: number[]; participants: number; winners: number;}[]>([]);
+    const [currentWeekLabel, setCurrentWeekLabel] = useState<string>("-");
+    const [onlineCount, setOnlineCount] = useState<number>(0);
+    const [loading, setLoading] = useState<boolean>(false);
     const [manualInput, setManualInput] = useState("");
+
+    // Create Player form state
+    const [playerName, setPlayerName] = useState("");
+    const [playerEmail, setPlayerEmail] = useState("");
+    const [playerPhone, setPlayerPhone] = useState("");
+    const [playerPassword, setPlayerPassword] = useState("");
 
     const handleManualDraw = () => {
         const num = parseInt(manualInput);
@@ -33,21 +47,53 @@ export default function AdminPage() {
 
     const clearDrawnNumbers = () => setDrawnNumbers([]);
 
-    // MOCK DATA (replace later with backend)
-    const participants = [
-        { name: "Anders Nielsen", numbers: [1, 4, 7, 10, 13], matches: 2, email: "anders@email.dk" },
-        { name: "Maria Jensen", numbers: [2, 5, 8, 11, 14, 16], matches: 1, email: "maria@email.dk" },
-        { name: "Peter Hansen", numbers: [3, 6, 9, 12, 15], matches: 0, email: "peter@email.dk" },
-        { name: "Laura Andersen", numbers: [1, 2, 3, 4, 5], matches: 3, email: "laura@email.dk" },
-        { name: "Thomas Larsen", numbers: [7, 8, 9, 10, 11, 12], matches: 1, email: "thomas@email.dk" },
-    ];
+    useEffect(() => {
+        const load = async () => {
+            setLoading(true);
+            try {
+                const [active, parts, history] = await Promise.all([
+                    boardsApi.getActive().catch(() => null),
+                    boardsApi.getParticipants().catch(() => []),
+                    boardsApi.getHistory(10).catch(() => []),
+                ]);
 
-    const gameHistory = [
-        { id: 1, week: "Uge 46 2024", date: "18.11.2024", numbers: [3, 7, 12], participants: 5, winners: 0 },
-        { id: 2, week: "Uge 45 2024", date: "11.11.2024", numbers: [1, 8, 15], participants: 4, winners: 0 },
-        { id: 3, week: "Uge 44 2024", date: "04.11.2024", numbers: [4, 9, 13], participants: 6, winners: 1 },
-        { id: 4, week: "Uge 43 2024", date: "28.10.2024", numbers: [2, 6, 14], participants: 5, winners: 0 },
-    ];
+                if (active) {
+                    setDrawnNumbers(active.numbers ?? []);
+                    if (active.week && active.year) {
+                        setCurrentWeekLabel(`Uge ${active.week} ${active.year}`);
+                    } else {
+                        setCurrentWeekLabel("Aktivt spil");
+                    }
+                } else {
+                    setCurrentWeekLabel("Ingen aktiv");
+                }
+
+                const mappedParts = (parts as any[]).map(p => ({
+                    name: p.name,
+                    email: p.email,
+                    numbers: p.numbers ?? [],
+                    matches: p.matches ?? 0,
+                }));
+                setParticipants(mappedParts);
+                setOnlineCount(mappedParts.length);
+
+                const mappedHist = (history as any[]).map((h:any) => ({
+                    id: h.boardId,
+                    week: `Uge ${h.week} ${h.year}`,
+                    date: new Date(h.endDate ?? h.startDate).toLocaleDateString('da-DK'),
+                    numbers: h.numbers ?? [],
+                    participants: h.participants ?? 0,
+                    winners: h.winners ?? 0,
+                }));
+                setGameHistory(mappedHist);
+            } catch (e:any) {
+                toast.error(e?.message ?? 'Kunne ikke hente data');
+            } finally {
+                setLoading(false);
+            }
+        };
+        load();
+    }, []);
 
     return (
         <div className="space-y-6 p-4">
@@ -58,7 +104,7 @@ export default function AdminPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-gray-600">Deltagere (Online)</p>
-                                <p className="text-[#ed1c24]">5 spillere</p>
+                                <p className="text-[#ed1c24]">{onlineCount} spillere</p>
                             </div>
                             <Users size={32} className="text-[#ed1c24]" />
                         </div>
@@ -70,13 +116,47 @@ export default function AdminPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-gray-600">Nuværende spil</p>
-                                <p>Uge 46 2024</p>
+                                <p>{currentWeekLabel}</p>
                             </div>
                             <Trophy size={32} className="text-amber-500" />
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Create Player */}
+            <Card className="border">
+                <CardHeader>
+                    <CardTitle>Opret ny spiller</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                    <Input placeholder="Navn" value={playerName} onChange={e=>setPlayerName(e.target.value)} />
+                    <Input placeholder="Email" type="email" value={playerEmail} onChange={e=>setPlayerEmail(e.target.value)} />
+                    <Input placeholder="Telefon" value={playerPhone} onChange={e=>setPlayerPhone(e.target.value)} />
+                    <Input placeholder="Adgangskode (min 8)" type="password" value={playerPassword} onChange={e=>setPlayerPassword(e.target.value)} />
+                    <Button
+                        onClick={async ()=>{
+                            try{
+                                const res = await playersApi.createPlayer({
+                                    name: playerName,
+                                    email: playerEmail,
+                                    phoneNumber: playerPhone,
+                                    password: playerPassword
+                                });
+                                toast.success(`Spiller oprettet: ${res.name}`);
+                                // clear
+                                setPlayerName("");
+                                setPlayerEmail("");
+                                setPlayerPhone("");
+                                setPlayerPassword("");
+                            }catch(e:any){
+                                toast.error(e?.message ?? 'Kunne ikke oprette spiller');
+                            }
+                        }}
+                        disabled={!playerName || !playerEmail || !playerPhone || playerPassword.length < 8}
+                    >Opret spiller</Button>
+                </CardContent>
+            </Card>
 
             {/* TABS */}
             <Tabs defaultValue="draw" className="w-full">
@@ -179,50 +259,70 @@ export default function AdminPage() {
                 <TabsContent value="participants">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Deltagerliste – Uge 46 2024</CardTitle>
+                            <CardTitle>Deltagerliste – {currentWeekLabel}</CardTitle>
                         </CardHeader>
 
                         <CardContent>
-                            <div className="space-y-3">
-                                {participants.map((p, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="border rounded-lg p-4 hover:border-[#ed1c24]"
-                                    >
-                                        <div className="flex justify-between mb-3">
-                                            <div>
-                                                <p>{p.name}</p>
-                                                <p className="text-sm text-gray-600">{p.email}</p>
+                            {loading ? (
+                                <div className="space-y-3">
+                                    {[...Array(3)].map((_, i) => (
+                                        <div key={i} className="border rounded-lg p-4 animate-pulse">
+                                            <div className="flex justify-between mb-3">
+                                                <div className="h-4 bg-gray-200 rounded w-40" />
+                                                <div className="h-6 bg-gray-200 rounded w-20" />
                                             </div>
-
-                                            {drawnNumbers.length === 3 && p.matches > 0 && (
-                                                <Badge className={p.matches === 3 ? "bg-green-600" : "bg-blue-600"}>
-                                                    {p.matches} matches
-                                                </Badge>
-                                            )}
-                                        </div>
-
-                                        <div className="flex items-center space-x-2">
-                                            <span className="text-sm text-gray-600">Valgte numre:</span>
-
-                                            <div className="flex flex-wrap gap-1">
-                                                {p.numbers.map((num) => (
-                                                    <div
-                                                        key={num}
-                                                        className={`w-8 h-8 flex items-center justify-center rounded text-xs ${
-                                                            drawnNumbers.includes(num)
-                                                                ? "bg-[#ed1c24] text-white"
-                                                                : "bg-gray-200"
-                                                        }`}
-                                                    >
-                                                        {num}
-                                                    </div>
+                                            <div className="flex gap-1">
+                                                {[...Array(8)].map((_, j) => (
+                                                    <div key={j} className="w-8 h-8 bg-gray-200 rounded" />
                                                 ))}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            ) : participants.length === 0 ? (
+                                <p className="text-center text-gray-500">Ingen deltagere fundet.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {participants.map((p, idx) => (
+                                        <div
+                                            key={idx}
+                                            className="border rounded-lg p-4 hover:border-[#ed1c24]"
+                                        >
+                                            <div className="flex justify-between mb-3">
+                                                <div>
+                                                    <p>{p.name}</p>
+                                                    <p className="text-sm text-gray-600">{p.email}</p>
+                                                </div>
+
+                                                {drawnNumbers.length === 3 && p.matches > 0 && (
+                                                    <Badge className={p.matches === 3 ? "bg-green-600" : "bg-blue-600"}>
+                                                        {p.matches} matches
+                                                    </Badge>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center space-x-2">
+                                                <span className="text-sm text-gray-600">Valgte numre:</span>
+
+                                                <div className="flex flex-wrap gap-1">
+                                                    {p.numbers.map((num) => (
+                                                        <div
+                                                            key={num}
+                                                            className={`w-8 h-8 flex items-center justify-center rounded text-xs ${
+                                                                drawnNumbers.includes(num)
+                                                                    ? "bg-[#ed1c24] text-white"
+                                                                    : "bg-gray-200"
+                                                            }`}
+                                                        >
+                                                            {num}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -236,40 +336,58 @@ export default function AdminPage() {
                         </CardHeader>
 
                         <CardContent>
-                            <div className="space-y-2">
-                                {gameHistory.map((game) => (
-                                    <div
-                                        key={game.id}
-                                        className="border rounded-lg p-4 hover:border-[#ed1c24]"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="space-y-1">
-                                                <p>{game.week}</p>
-                                                <p className="text-sm text-gray-600">{game.date}</p>
-
-                                                <div className="text-sm text-gray-600 flex space-x-4">
-                                                    <span>{game.participants} deltagere</span>
-
-                                                    {game.winners > 0 && (
-                                                        <span className="text-green-600">{game.winners} vindere</span>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex space-x-1">
-                                                {game.numbers.map((n) => (
-                                                    <div
-                                                        key={n}
-                                                        className="w-8 h-8 flex items-center justify-center bg-[#ed1c24] text-white rounded text-xs"
-                                                    >
-                                                        {n}
-                                                    </div>
+                            {loading ? (
+                                <div className="space-y-2">
+                                    {[...Array(3)].map((_, i) => (
+                                        <div key={i} className="border rounded-lg p-4 animate-pulse">
+                                            <div className="h-4 bg-gray-200 rounded w-32 mb-2" />
+                                            <div className="h-3 bg-gray-200 rounded w-24 mb-4" />
+                                            <div className="flex gap-1">
+                                                {[...Array(3)].map((_, j) => (
+                                                    <div key={j} className="w-8 h-8 bg-gray-200 rounded" />
                                                 ))}
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            ) : gameHistory.length === 0 ? (
+                                <p className="text-center text-gray-500">Ingen historik at vise.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {gameHistory.map((game) => (
+                                        <div
+                                            key={game.id}
+                                            className="border rounded-lg p-4 hover:border-[#ed1c24]"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="space-y-1">
+                                                    <p>{game.week}</p>
+                                                    <p className="text-sm text-gray-600">{game.date}</p>
+
+                                                    <div className="text-sm text-gray-600 flex space-x-4">
+                                                        <span>{game.participants} deltagere</span>
+
+                                                        {game.winners > 0 && (
+                                                            <span className="text-green-600">{game.winners} vindere</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex space-x-1">
+                                                    {game.numbers.map((n) => (
+                                                        <div
+                                                            key={n}
+                                                            className="w-8 h-8 flex items-center justify-center bg-[#ed1c24] text-white rounded text-xs"
+                                                        >
+                                                            {n}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

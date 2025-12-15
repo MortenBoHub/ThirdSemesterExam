@@ -20,4 +20,6 @@ public partial class Admin
     public bool Isdeleted { get; set; }
 
     public virtual ICollection<Drawnnumber> Drawnnumbers { get; set; } = new List<Drawnnumber>();
+
+    public virtual ICollection<Fundrequest> Processedfundrequests { get; set; } = new List<Fundrequest>();
 }

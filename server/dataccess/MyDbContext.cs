@@ -23,6 +23,8 @@ public partial class MyDbContext : DbContext
 
     public virtual DbSet<Playerboardnumber> Playerboardnumbers { get; set; }
 
+    public virtual DbSet<Fundrequest> Fundrequests { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Admin>(entity =>
@@ -104,6 +106,33 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Name).HasColumnName("name");
             entity.Property(e => e.Passwordhash).HasColumnName("passwordhash");
             entity.Property(e => e.Phonenumber).HasColumnName("phonenumber");
+        });
+
+        modelBuilder.Entity<Fundrequest>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("fundrequests_pkey");
+
+            entity.ToTable("fundrequests", "dødeduer");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Playerid).HasColumnName("playerid");
+            entity.Property(e => e.Amount)
+                .HasPrecision(10, 2)
+                .HasColumnName("amount");
+            entity.Property(e => e.Transactionnumber).HasColumnName("transactionnumber");
+            entity.Property(e => e.Status).HasColumnName("status");
+            entity.Property(e => e.Createdat).HasColumnName("createdat");
+            entity.Property(e => e.Processedat).HasColumnName("processedat");
+            entity.Property(e => e.Processedbyadminid).HasColumnName("processedbyadminid");
+
+            entity.HasOne(d => d.Player).WithMany(p => p.Fundrequests)
+                .HasForeignKey(d => d.Playerid)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fundrequests_playerid_fkey");
+
+            entity.HasOne(d => d.Processedbyadmin).WithMany(p => p.Processedfundrequests)
+                .HasForeignKey(d => d.Processedbyadminid)
+                .HasConstraintName("fundrequests_processedbyadminid_fkey");
         });
 
         modelBuilder.Entity<Playerboard>(entity =>

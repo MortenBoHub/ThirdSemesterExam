@@ -33,8 +33,8 @@ create table dødeduer.boards
     id           text primary key         not null,
     weekNumber   int                      not null,
     year         int                      not null,
-    startDate    timestamp with time zone not null,
-    endDate      timestamp with time zone not null,
+    startDate    timestamp with time zone,
+    endDate      timestamp with time zone,
     isActive     boolean                  not null default false,
     createdAt    timestamp with time zone not null
 );
@@ -92,4 +92,18 @@ DO $$
               AND b.year = to_char(gs, 'IYYY')::int
         );
     END$$;
+
+
+-- Fund Requests table
+create table dødeduer.fundrequests
+(
+    id                   text primary key         not null,
+    playerId             text                     not null references dødeduer.player(id),
+    amount               numeric(10, 2)           not null,
+    transactionNumber    text                     not null,
+    status               text                     not null check (status in ('pending','approved','denied')),
+    createdAt            timestamp with time zone not null,
+    processedAt          timestamp with time zone,
+    processedByAdminId   text                     references dødeduer.admin(id)
+);
 
