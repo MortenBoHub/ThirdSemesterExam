@@ -299,10 +299,10 @@ export default function UserView() {
                     {/* Add Board Button */}
                     <Button
                         onClick={addBoard}
-                        className="w-full mt-4 border-[#ed1c24] text-[#ed1c24] hover:bg-[#ed1c24] hover:text-white border-2 py-2 rounded"
+                        className="w-full mt-4 border-[#ed1c24] text-[#ed1c24] hover:bg-[#ed1c24] hover:text-white border-2 py-2 rounded flex items-center justify-center gap-2"
                     >
-                        <Plus size={20} className="mr-2" />
-                        Tilføj nyt bræt
+                        <Plus size={20} />
+                        <span>Tilføj nyt bræt</span>
                     </Button>
 
                     {/* Total and Submit */}

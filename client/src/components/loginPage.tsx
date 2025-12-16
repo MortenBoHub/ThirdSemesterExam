@@ -61,7 +61,7 @@ export default function LoginPage({ onLogin }: LoginScreenProps) {
                 </CardHeader>
 
                 <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form onSubmit={handleSubmit} className="space-y-6 flex flex-col items-center">
                         <div className="space-y-4">
                             {/* Username field */}
                             <div className="space-y-2">
@@ -75,7 +75,7 @@ export default function LoginPage({ onLogin }: LoginScreenProps) {
                                     onChange={(e) => setUsername(e.target.value)}
                                     onKeyPress={handleKeyPress}
                                     placeholder="Indtast brugernavn"
-                                    className="h-12 text-lg border-2 focus:border-[#ed1c24]"
+                                    className="h-12 text-center border-2 focus:border-[#ed1c24]"
                                     autoFocus
                                 />
                             </div>
@@ -92,7 +92,7 @@ export default function LoginPage({ onLogin }: LoginScreenProps) {
                                     onChange={(e) => setPassword(e.target.value)}
                                     onKeyPress={handleKeyPress}
                                     placeholder="Indtast kodeord"
-                                    className="h-12 text-lg border-2 focus:border-[#ed1c24]"
+                                    className="h-12 text-center border-2 focus:border-[#ed1c24]"
                                 />
                             </div>
                         </div>
@@ -107,7 +107,8 @@ export default function LoginPage({ onLogin }: LoginScreenProps) {
                         {/* Login button */}
                         <Button
                             type="submit"
-                            className="w-full h-12 bg-[#ed1c24] hover:bg-[#d11920] transition-all shadow-md hover:shadow-lg text-lg"
+                            className="w-full h-12 flex items-center justify-center bg-[#ed1c24] hover:bg-[#d11920] transition-all shadow-md hover:shadow-lg text-lg"
+
                         >
                             Log ind
                         </Button>

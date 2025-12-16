@@ -3,5 +3,5 @@
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
 
 export const Input: React.FC<InputProps> = (props) => {
-    return <input {...props} className={`px-3 py-2 border rounded ${props.className}`} />;
+    return <input {...props} className={`px-10 py-5 border rounded ${props.className}`} />;
 };

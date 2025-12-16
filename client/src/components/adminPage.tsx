@@ -173,13 +173,13 @@ export default function AdminPage() {
                             <CardTitle className="text-[#ed1c24]">Træk vindernumre manuelt</CardTitle>
                         </CardHeader>
 
-                        <CardContent className="space-y-6 pt-6">
-                            {/* Number Boxes */}
-                            <div className="flex justify-center space-x-4 py-8">
+                        <CardContent className="pt-10 pb-10 space-y-8">
+                        {/* Number Boxes */}
+                            <div className="flex justify-center space-x-40 py-48">
                                 {[0, 1, 2].map((i) => (
                                     <div
                                         key={i}
-                                        className={`w-20 h-20 rounded-lg flex items-center justify-center text-xl ${
+                                        className={`w-60 h-60 rounded-lg flex items-center justify-center text-xl ${
                                             drawnNumbers[i]
                                                 ? "bg-[#ed1c24] text-white"
                                                 : "bg-gray-200 text-gray-400"
@@ -191,7 +191,7 @@ export default function AdminPage() {
                             </div>
 
                             {/* Manual input */}
-                            <div className="flex space-x-2 max-w-md mx-auto">
+                            <div className="flex items-center justify-center space-x-10 max-w-md mx-auto">
                                 <Input
                                     type="number"
                                     min={1}

@@ -19,7 +19,7 @@ export default function NumberBoard({ selectedNumbers, onNumberSelect }: NumberB
                         type="button"
                         onClick={() => onNumberSelect(num)}
                         className={
-                            "w-12 h-12 rounded-md text-sm font-medium flex items-center justify-center transition " +
+                            "w-24 h-24 rounded-md text-sm font-medium flex items-center justify-center transition " +
                             (isSelected
                                 ? "bg-[#ed1c24] text-white shadow"
                                 : "bg-gray-100 text-gray-800 hover:bg-gray-200")

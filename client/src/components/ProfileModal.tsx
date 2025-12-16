@@ -309,7 +309,7 @@ export default function ProfileModal({
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8 max-h-[90vh] flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b">
                     <h2>{showUserManagement ? 'Brugerstyring' : 'Profil'}</h2>
@@ -322,8 +322,8 @@ export default function ProfileModal({
                 </div>
 
                 {/* Content */}
-                <div className="p-6">
-                    {isAdmin && showUserManagement ? (
+                <div className="p-6 overflow-y-auto">
+                {isAdmin && showUserManagement ? (
                         <div className="space-y-4">
                             {/* Exit Button */}
                             <Button
