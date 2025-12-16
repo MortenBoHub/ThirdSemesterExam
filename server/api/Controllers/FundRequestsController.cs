@@ -5,6 +5,7 @@ using Sieve.Models;
 using Sieve.Services;
 using dataccess;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace api.Controllers;
 
@@ -19,6 +20,7 @@ public class FundRequestsController(
     /// <summary>
     /// Player creates a fund request for adding money to their account
     /// </summary>
+    [Authorize(Roles = "User")]
     [HttpPost]
     public async Task<ActionResult<object>> Create([FromBody] CreateFundRequestDto dto)
     {
@@ -42,6 +44,7 @@ public class FundRequestsController(
     /// Admin: list fund requests with optional status and Sieve query (filter/sort/page).
     /// Defaults to oldest first (CreatedAt ascending) when no Sorts are provided.
     /// </summary>
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<ActionResult<List<object>>> List([FromQuery] string? status = null, [FromQuery] SieveModel? sieveModel = null)
     {
@@ -93,6 +96,7 @@ public class FundRequestsController(
         }).ToList());
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("{id}/approve")]
     public async Task<ActionResult<object>> Approve([FromRoute] string id)
     {
@@ -110,6 +114,7 @@ public class FundRequestsController(
         });
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("{id}/deny")]
     public async Task<ActionResult<object>> Deny([FromRoute] string id)
     {

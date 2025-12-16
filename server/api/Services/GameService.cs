@@ -1,15 +1,14 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.Globalization;
-using System.Security.Cryptography;
-using System.Text;
 using api.Models.Requests;
 using api.Models.Responses;
 using dataccess;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 
 namespace api.Services;
 
-public class GameService(MyDbContext ctx, TimeProvider timeProvider) : IGameService
+public class GameService(MyDbContext ctx, TimeProvider timeProvider, IPasswordHasher<Player> passwordHasher) : IGameService
 {
     public async Task<Player> CreatePlayer(CreatePlayerRequestDto dto)
     {
@@ -25,11 +24,12 @@ public class GameService(MyDbContext ctx, TimeProvider timeProvider) : IGameServ
             Name = dto.Name,
             Email = dto.Email,
             Phonenumber = dto.PhoneNumber,
-            Passwordhash = ComputeSha512(dto.Password),
+            Passwordhash = string.Empty,
             Createdat = now,
             Funds = 0m,
             Isdeleted = false
         };
+        player.Passwordhash = passwordHasher.HashPassword(player, dto.Password);
 
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync();
@@ -149,11 +149,11 @@ public class GameService(MyDbContext ctx, TimeProvider timeProvider) : IGameServ
         var player = await ctx.Players.FirstOrDefaultAsync(p => p.Id == playerId && !p.Isdeleted)
                      ?? throw new ValidationException("Player not found");
 
-        var currentHash = ComputeSha512(currentPassword);
-        if (!string.Equals(player.Passwordhash, currentHash, StringComparison.Ordinal))
+        var verify = passwordHasher.VerifyHashedPassword(player, player.Passwordhash, currentPassword);
+        if (verify == PasswordVerificationResult.Failed)
             throw new ValidationException("Current password is incorrect");
 
-        player.Passwordhash = ComputeSha512(newPassword);
+        player.Passwordhash = passwordHasher.HashPassword(player, newPassword);
         await ctx.SaveChangesAsync();
     }
 
@@ -471,11 +471,4 @@ public class GameService(MyDbContext ctx, TimeProvider timeProvider) : IGameServ
         return req;
     }
 
-    private static string ComputeSha512(string input)
-    {
-        var bytes = SHA512.HashData(Encoding.UTF8.GetBytes(input));
-        var sb = new StringBuilder(bytes.Length * 2);
-        foreach (var b in bytes) sb.Append(b.ToString("x2"));
-        return sb.ToString();
-    }
 }

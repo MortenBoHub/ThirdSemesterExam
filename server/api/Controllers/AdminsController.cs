@@ -1,6 +1,7 @@
 ﻿using api.Services;
 using dataccess;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace api.Controllers;
 
@@ -9,6 +10,7 @@ namespace api.Controllers;
 public class AdminsController(IGameService gameService, IAuthService authService) : ControllerBase
 {
     // Soft delete an admin (mark isDeleted = true)
+    [Authorize(Roles = "Admin")]
     [HttpPatch("{id}/soft-delete")]
     public async Task<ActionResult<Admin>> SoftDelete([FromRoute] string id)
     {
@@ -21,6 +23,7 @@ public class AdminsController(IGameService gameService, IAuthService authService
     }
 
     // Restore an admin (set isDeleted = false)
+    [Authorize(Roles = "Admin")]
     [HttpPatch("{id}/restore")]
     public async Task<ActionResult<Admin>> Restore([FromRoute] string id)
     {
