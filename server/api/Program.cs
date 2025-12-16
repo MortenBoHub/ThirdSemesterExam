@@ -13,6 +13,7 @@ using Sieve.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using api.Models;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace api;
 
@@ -31,7 +32,8 @@ public class Program
         services.AddScoped<ISieveProcessor, ApplicationSieveProcessor>();
         services.AddControllers().AddJsonOptions(opts =>
         {
-            opts.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.Preserve;
+            // After DTO shaping, avoid $id/$ref artifacts
+            opts.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             opts.JsonSerializerOptions.MaxDepth = 128;
             // Stage 3: standardize casing to camelCase
             opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -45,6 +47,18 @@ public class Program
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
 
+        // Rate limiting (login)
+        services.AddRateLimiter(options =>
+        {
+            options.AddFixedWindowLimiter("login", opt =>
+            {
+                opt.PermitLimit = 10;
+                opt.Window = TimeSpan.FromMinutes(1);
+                opt.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+                opt.QueueLimit = 0;
+            });
+        });
+
         // Authentication & Authorization (Stage 1)
         // Read JwtSecret from AppOptions (already registered as singleton)
         using (var sp = services.BuildServiceProvider())
@@ -52,10 +66,11 @@ public class Program
             var appOptions = sp.GetRequiredService<AppOptions>();
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appOptions.JwtSecret));
 
+            var isProd = string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase);
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {
-                    options.RequireHttpsMetadata = false;
+                    options.RequireHttpsMetadata = isProd;
                     options.SaveToken = true;
                     options.TokenValidationParameters = new TokenValidationParameters
                     {
@@ -92,6 +107,17 @@ public class Program
         });*/
         
         app.UseExceptionHandler(config => { });
+        
+        // Safety guard: warn if mock logins are enabled in Production
+        var appOptions = app.Services.GetRequiredService<AppOptions>();
+        var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        if (app.Environment.IsProduction() &&
+            (appOptions.EnableMockLogin || appOptions.EnableMockLoginAdmin || appOptions.EnableMockLoginUser))
+        {
+            logger.LogWarning(
+                "Mock login is ENABLED in Production. AdminMock={AdminMock}, UserMock={UserMock}, LegacyMock={LegacyMock}",
+                appOptions.EnableMockLoginAdmin, appOptions.EnableMockLoginUser, appOptions.EnableMockLogin);
+        }
         app.UseOpenApi();
         app.UseSwaggerUi();
         app.MapScalarApiReference(options => options.OpenApiRoutePattern = "/swagger/v1/swagger.json"
@@ -99,6 +125,11 @@ public class Program
         // Stage 1: Enable authentication/authorization middleware
         app.UseAuthentication();
         app.UseAuthorization();
+        app.UseRateLimiter();
+        
+        // Health endpoint
+        app.MapGet("/api/health", () => Results.Ok(new { status = "ok", time = DateTimeOffset.UtcNow }))
+            .AllowAnonymous();
         app.MapControllers();
         app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts").GetAwaiter().GetResult();
 

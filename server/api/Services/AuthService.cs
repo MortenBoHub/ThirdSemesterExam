@@ -46,11 +46,11 @@ public class AuthService(
 
         using var doc = JsonDocument.Parse(jsonString);
 
-        // Stage 2: Validate expiration if present
+        // Stage 2: Validate expiration if present (use injected TimeProvider for determinism)
         if (doc.RootElement.TryGetProperty("exp", out var expProp) && expProp.ValueKind == JsonValueKind.Number)
         {
             var exp = expProp.GetInt64();
-            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var now = timeProvider.GetUtcNow().ToUnixTimeSeconds();
             if (now >= exp)
                 throw new ValidationException("Token has expired");
         }
@@ -186,7 +186,7 @@ public class AuthService(
     private string CreateJwt(JwtClaims claims)
     {
         var ttlMinutes = appOptions.JwtTtlMinutes <= 0 ? 180 : appOptions.JwtTtlMinutes;
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var exp = now.AddMinutes(ttlMinutes).ToUnixTimeSeconds();
         var iat = now.ToUnixTimeSeconds();
 

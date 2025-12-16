@@ -32,11 +32,11 @@ public class FundRequestsController(
         return Ok(new
         {
             created.Id,
-            created.Playerid,
+            PlayerId = created.Playerid,
             created.Amount,
-            created.Transactionnumber,
+            TransactionNumber = created.Transactionnumber,
             created.Status,
-            created.Createdat
+            CreatedAt = created.Createdat
         });
     }
 
@@ -86,13 +86,13 @@ public class FundRequestsController(
         return Ok(list.Select(r => new
         {
             r.Id,
-            r.Playerid,
+            PlayerId = r.Playerid,
             r.Amount,
-            r.Transactionnumber,
+            TransactionNumber = r.Transactionnumber,
             r.Status,
-            r.Createdat,
-            r.Processedat,
-            r.Processedbyadminid
+            CreatedAt = r.Createdat,
+            ProcessedAt = r.Processedat,
+            ProcessedByAdminId = r.Processedbyadminid
         }).ToList());
     }
 
@@ -109,8 +109,8 @@ public class FundRequestsController(
         {
             updated.Id,
             updated.Status,
-            updated.Processedat,
-            updated.Processedbyadminid
+            ProcessedAt = updated.Processedat,
+            ProcessedByAdminId = updated.Processedbyadminid
         });
     }
 
@@ -127,8 +127,8 @@ public class FundRequestsController(
         {
             updated.Id,
             updated.Status,
-            updated.Processedat,
-            updated.Processedbyadminid
+            ProcessedAt = updated.Processedat,
+            ProcessedByAdminId = updated.Processedbyadminid
         });
     }
 }

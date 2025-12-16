@@ -3,6 +3,7 @@ using api.Models.Requests;
 using api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace api.Controllers;
 
@@ -12,6 +13,7 @@ public class AuthController(IAuthService authService) : ControllerBase
 {
     [AllowAnonymous]
     [HttpPost(nameof(Login))]
+    [EnableRateLimiting("login")]
     public async Task<JwtResponse> Login([FromBody] LoginRequestDto dto)
     {
         return await authService.Login(dto);
