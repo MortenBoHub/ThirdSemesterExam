@@ -5,6 +5,7 @@ using Sieve.Models;
 using Sieve.Services;
 using dataccess;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace api.Controllers;
 
@@ -19,6 +20,7 @@ public class FundRequestsController(
     /// <summary>
     /// Player creates a fund request for adding money to their account
     /// </summary>
+    [Authorize(Roles = "User")]
     [HttpPost]
     public async Task<ActionResult<object>> Create([FromBody] CreateFundRequestDto dto)
     {
@@ -30,11 +32,11 @@ public class FundRequestsController(
         return Ok(new
         {
             created.Id,
-            created.Playerid,
+            PlayerId = created.Playerid,
             created.Amount,
-            created.Transactionnumber,
+            TransactionNumber = created.Transactionnumber,
             created.Status,
-            created.Createdat
+            CreatedAt = created.Createdat
         });
     }
 
@@ -42,6 +44,7 @@ public class FundRequestsController(
     /// Admin: list fund requests with optional status and Sieve query (filter/sort/page).
     /// Defaults to oldest first (CreatedAt ascending) when no Sorts are provided.
     /// </summary>
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<ActionResult<List<object>>> List([FromQuery] string? status = null, [FromQuery] SieveModel? sieveModel = null)
     {
@@ -83,16 +86,17 @@ public class FundRequestsController(
         return Ok(list.Select(r => new
         {
             r.Id,
-            r.Playerid,
+            PlayerId = r.Playerid,
             r.Amount,
-            r.Transactionnumber,
+            TransactionNumber = r.Transactionnumber,
             r.Status,
-            r.Createdat,
-            r.Processedat,
-            r.Processedbyadminid
+            CreatedAt = r.Createdat,
+            ProcessedAt = r.Processedat,
+            ProcessedByAdminId = r.Processedbyadminid
         }).ToList());
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("{id}/approve")]
     public async Task<ActionResult<object>> Approve([FromRoute] string id)
     {
@@ -105,11 +109,12 @@ public class FundRequestsController(
         {
             updated.Id,
             updated.Status,
-            updated.Processedat,
-            updated.Processedbyadminid
+            ProcessedAt = updated.Processedat,
+            ProcessedByAdminId = updated.Processedbyadminid
         });
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("{id}/deny")]
     public async Task<ActionResult<object>> Deny([FromRoute] string id)
     {
@@ -122,8 +127,8 @@ public class FundRequestsController(
         {
             updated.Id,
             updated.Status,
-            updated.Processedat,
-            updated.Processedbyadminid
+            ProcessedAt = updated.Processedat,
+            ProcessedByAdminId = updated.Processedbyadminid
         });
     }
 }

@@ -1,12 +1,76 @@
 {
-  "x-generator": "NSwag v14.6.2.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))",
+  "x-generator": "NSwag v14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))",
   "openapi": "3.0.0",
   "info": {
     "title": "My Title",
     "version": "1.0.0"
   },
   "paths": {
-    "/Login": {
+    "/api/Admins/{id}/soft-delete": {
+      "patch": {
+        "tags": [
+          "Admins"
+        ],
+        "operationId": "Admins_SoftDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Admins/{id}/restore": {
+      "patch": {
+        "tags": [
+          "Admins"
+        ],
+        "operationId": "Admins_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/Login": {
       "post": {
         "tags": [
           "Auth"
@@ -38,7 +102,7 @@
         }
       }
     },
-    "/Register": {
+    "/api/Auth/Register": {
       "post": {
         "tags": [
           "Auth"
@@ -70,7 +134,7 @@
         }
       }
     },
-    "/WhoAmI": {
+    "/api/Auth/WhoAmI": {
       "post": {
         "tags": [
           "Auth"
@@ -90,24 +154,33 @@
         }
       }
     },
-    "/GetBooks": {
-      "post": {
+    "/api/Boards/active": {
+      "get": {
         "tags": [
-          "Library"
+          "Boards"
         ],
-        "operationId": "Library_GetBooks",
-        "requestBody": {
-          "x-name": "sieveModel",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SieveModel"
+        "operationId": "Boards_GetActive",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
               }
             }
-          },
-          "required": true,
-          "x-position": 1
-        },
+          }
+        }
+      }
+    },
+    "/api/Boards/participants": {
+      "get": {
+        "tags": [
+          "Boards"
+        ],
+        "operationId": "Boards_GetParticipants",
         "responses": {
           "200": {
             "description": "",
@@ -116,7 +189,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Book"
+                    "$ref": "#/components/schemas/ActiveParticipantDto"
                   }
                 }
               }
@@ -125,82 +198,20 @@
         }
       }
     },
-    "/CreateBook": {
-      "post": {
+    "/api/Boards/history": {
+      "get": {
         "tags": [
-          "Library"
+          "Boards"
         ],
-        "operationId": "Library_CreateBook",
-        "requestBody": {
-          "x-name": "dto",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateBookRequestDto"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Book"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/UpdateBook": {
-      "put": {
-        "tags": [
-          "Library"
-        ],
-        "operationId": "Library_UpdateBook",
-        "requestBody": {
-          "x-name": "dto",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateBookRequestDto"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Book"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/DeleteBook": {
-      "delete": {
-        "tags": [
-          "Library"
-        ],
-        "operationId": "Library_DeleteBook",
+        "operationId": "Boards_GetHistory",
         "parameters": [
           {
-            "name": "bookId",
+            "name": "take",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int32",
+              "default": 10
             },
             "x-position": 1
           }
@@ -211,7 +222,600 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Book"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GameHistoryDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Boards/draw": {
+      "post": {
+        "tags": [
+          "Boards"
+        ],
+        "operationId": "Boards_Draw",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrawNumbersRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Boards/{id}/activate": {
+      "patch": {
+        "tags": [
+          "Boards"
+        ],
+        "operationId": "Boards_Activate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Boards/{id}/deactivate": {
+      "patch": {
+        "tags": [
+          "Boards"
+        ],
+        "operationId": "Boards_Deactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/FundRequests": {
+      "post": {
+        "tags": [
+          "FundRequests"
+        ],
+        "operationId": "FundRequests_Create",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFundRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "FundRequests"
+        ],
+        "operationId": "FundRequests_List",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 1
+          },
+          {
+            "name": "Filters",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 2
+          },
+          {
+            "name": "Sorts",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 3
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
+              "nullable": true
+            },
+            "x-position": 4
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
+              "nullable": true
+            },
+            "x-position": 5
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/FundRequests/{id}/approve": {
+      "post": {
+        "tags": [
+          "FundRequests"
+        ],
+        "operationId": "FundRequests_Approve",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/FundRequests/{id}/deny": {
+      "post": {
+        "tags": [
+          "FundRequests"
+        ],
+        "operationId": "FundRequests_Deny",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Players": {
+      "get": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_GetPlayers",
+        "parameters": [
+          {
+            "name": "Filters",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 1
+          },
+          {
+            "name": "Sorts",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 2
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
+              "nullable": true
+            },
+            "x-position": 3
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
+              "nullable": true
+            },
+            "x-position": 4
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {}
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_CreatePlayer",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlayerRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Players/{id}": {
+      "get": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_GetPlayerById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_UpdatePlayer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlayerRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Players/{playerId}/boards": {
+      "post": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_CreateBoards",
+        "parameters": [
+          {
+            "name": "playerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlayerBoardsRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Playerboard"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Players/{id}/change-password": {
+      "post": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_ChangePassword",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 2
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Players/{id}/soft-delete": {
+      "patch": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_SoftDelete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Players/{id}/restore": {
+      "patch": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_Restore",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
@@ -263,48 +867,333 @@
         "properties": {
           "id": {
             "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "isMock": {
+            "type": "boolean"
           }
         }
       },
-      "Book": {
+      "ActiveParticipantDto": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": {
+          "playerId": {
             "type": "string"
           },
-          "title": {
+          "name": {
             "type": "string"
           },
-          "pages": {
+          "email": {
+            "type": "string"
+          },
+          "numbers": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "matches": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "GameHistoryDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "boardId": {
+            "type": "string"
+          },
+          "week": {
             "type": "integer",
             "format": "int32"
           },
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "numbers": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "participants": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "winners": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DrawNumbersRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "numbers": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "CreateFundRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "transactionNumber": {
+            "type": "string"
+          }
+        }
+      },
+      "CreatePlayerRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "email",
+          "phoneNumber",
+          "password"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 1
+          },
+          "phoneNumber": {
+            "type": "string",
+            "minLength": 5
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      },
+      "Playerboard": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "playerid": {
+            "type": "string"
+          },
+          "boardid": {
+            "type": "string"
+          },
           "createdat": {
             "type": "string",
             "format": "date-time"
           },
-          "genreid": {
+          "iswinner": {
+            "type": "boolean"
+          },
+          "board": {
+            "$ref": "#/components/schemas/Board"
+          },
+          "player": {
+            "$ref": "#/components/schemas/Player"
+          },
+          "playerboardnumbers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Playerboardnumber"
+            }
+          }
+        }
+      },
+      "Board": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "weeknumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startdate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enddate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isactive": {
+            "type": "boolean"
+          },
+          "createdat": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "drawnnumbers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Drawnnumber"
+            }
+          },
+          "playerboards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Playerboard"
+            }
+          }
+        }
+      },
+      "Drawnnumber": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "boardid": {
+            "type": "string"
+          },
+          "drawnnumber1": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "drawnat": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "drawnby": {
+            "type": "string"
+          },
+          "board": {
+            "$ref": "#/components/schemas/Board"
+          },
+          "drawnbyNavigation": {
+            "$ref": "#/components/schemas/Admin"
+          }
+        }
+      },
+      "Admin": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phonenumber": {
+            "type": "string"
+          },
+          "passwordhash": {
+            "type": "string"
+          },
+          "createdat": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isdeleted": {
+            "type": "boolean"
+          },
+          "drawnnumbers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Drawnnumber"
+            }
+          },
+          "processedfundrequests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Fundrequest"
+            }
+          }
+        }
+      },
+      "Fundrequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "playerid": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "transactionnumber": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdat": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "processedat": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "processedbyadminid": {
             "type": "string",
             "nullable": true
           },
-          "genre": {
+          "player": {
+            "$ref": "#/components/schemas/Player"
+          },
+          "processedbyadmin": {
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/Genre"
+                "$ref": "#/components/schemas/Admin"
               }
             ]
-          },
-          "authors": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Author"
-            }
           }
         }
       },
-      "Genre": {
+      "Player": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -314,156 +1203,120 @@
           "name": {
             "type": "string"
           },
+          "email": {
+            "type": "string"
+          },
+          "phonenumber": {
+            "type": "string"
+          },
+          "passwordhash": {
+            "type": "string"
+          },
           "createdat": {
             "type": "string",
             "format": "date-time"
           },
-          "books": {
+          "funds": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "isdeleted": {
+            "type": "boolean"
+          },
+          "playerboards": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Book"
+              "$ref": "#/components/schemas/Playerboard"
+            }
+          },
+          "fundrequests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Fundrequest"
             }
           }
         }
       },
-      "Author": {
+      "Playerboardnumber": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string"
           },
-          "name": {
+          "playerboardid": {
             "type": "string"
           },
-          "createdat": {
-            "type": "string",
-            "format": "date-time"
+          "selectednumber": {
+            "type": "integer",
+            "format": "int32"
           },
-          "books": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Book"
-            }
+          "playerboard": {
+            "$ref": "#/components/schemas/Playerboard"
           }
         }
       },
-      "SieveModel": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/SieveModelOfFilterTermAndSortTerm"
-          },
-          {
-            "type": "object",
-            "additionalProperties": false
-          }
-        ]
-      },
-      "SieveModelOfFilterTermAndSortTerm": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "filters": {
-            "type": "string",
-            "nullable": true
-          },
-          "sorts": {
-            "type": "string",
-            "nullable": true
-          },
-          "page": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 2147483647.0,
-            "minimum": 1.0,
-            "nullable": true
-          },
-          "pageSize": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 2147483647.0,
-            "minimum": 1.0,
-            "nullable": true
-          }
-        }
-      },
-      "CreateBookRequestDto": {
+      "CreatePlayerBoardsRequestDto": {
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "pages",
-          "title"
+          "selectedNumbers"
         ],
         "properties": {
-          "pages": {
+          "selectedNumbers": {
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 5,
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "repeatWeeks": {
             "type": "integer",
             "format": "int32",
-            "maximum": 2147483647.0,
+            "maximum": 52.0,
             "minimum": 1.0
-          },
-          "title": {
-            "type": "string",
-            "minLength": 1
           }
         }
       },
-      "UpdateBookRequestDto": {
+      "UpdatePlayerRequestDto": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "bookIdForLookupReference",
-          "newPageCount",
-          "newTitle",
-          "authorsIds"
-        ],
         "properties": {
-          "bookIdForLookupReference": {
+          "name": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "nullable": true
           },
-          "newPageCount": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 2147483647.0,
-            "minimum": 1.0
-          },
-          "newTitle": {
+          "email": {
             "type": "string",
-            "minLength": 1
+            "format": "email",
+            "nullable": true
           },
-          "authorsIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "genreId": {
+          "phonenumber": {
             "type": "string",
+            "minLength": 3,
             "nullable": true
           }
         }
       },
-      "SieveConstants": {
+      "ChangePasswordRequestDto": {
         "type": "object",
-        "description": "String constants from SieveConstants",
         "additionalProperties": false,
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
         "properties": {
-          "GenreName": {
+          "currentPassword": {
             "type": "string",
-            "readOnly": true,
-            "description": "Constant value: \"GenreName\"",
-            "default": "GenreName"
+            "minLength": 1
           },
-          "GenreId": {
+          "newPassword": {
             "type": "string",
-            "readOnly": true,
-            "description": "Constant value: \"GenreId\"",
-            "default": "GenreId"
+            "minLength": 6
           }
-        },
-        "x-constant-values": {
-          "GenreName": "GenreName",
-          "GenreId": "GenreId"
         }
       }
     }

@@ -1,6 +1,7 @@
 ﻿using api.Models.Responses;
 using api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace api.Controllers;
 
@@ -36,6 +37,7 @@ public class BoardsController(IGameService gameService, IAuthService authService
         return await gameService.GetGameHistory(take);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPost("draw")]
     public async Task<ActionResult> Draw([FromBody] DrawNumbersRequest dto)
     {
@@ -47,6 +49,7 @@ public class BoardsController(IGameService gameService, IAuthService authService
         return Ok();
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPatch("{id}/activate")]
     public async Task<ActionResult> Activate([FromRoute] string id)
     {
@@ -58,6 +61,7 @@ public class BoardsController(IGameService gameService, IAuthService authService
         return Ok(new { board.Id, board.Year, Week = board.Weeknumber, board.Isactive });
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpPatch("{id}/deactivate")]
     public async Task<ActionResult> Deactivate([FromRoute] string id)
     {

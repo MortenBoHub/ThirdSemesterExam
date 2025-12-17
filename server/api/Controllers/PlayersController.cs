@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Sieve.Models;
 using Sieve.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace api.Controllers;
 
@@ -13,7 +14,8 @@ namespace api.Controllers;
 public class PlayersController(IGameService gameService, ISieveProcessor sieve, MyDbContext ctx, IAuthService authService) : ControllerBase
 {
     [HttpGet]
-    public async Task<List<Player>> GetPlayers([FromQuery] SieveModel? sieveModel)
+    [AllowAnonymous]
+    public async Task<ActionResult<List<object>>> GetPlayers([FromQuery] SieveModel? sieveModel)
     {
         // Support filtering/sorting/paging via Sieve while keeping default behaviour
         var query = ctx.Players.AsNoTracking().Where(p => !p.Isdeleted);
@@ -27,37 +29,84 @@ public class PlayersController(IGameService gameService, ISieveProcessor sieve, 
             query = query.OrderByDescending(p => p.Createdat);
         }
 
-        return await query.ToListAsync();
+        var list = await query.ToListAsync();
+        var projected = list.Select(p => new
+        {
+            p.Id,
+            p.Name,
+            p.Email,
+            Phonenumber = p.Phonenumber,
+            p.Funds,
+            p.Createdat
+        }).ToList<object>();
+        return Ok(projected);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<Player>> GetPlayerById([FromRoute] string id)
+    [AllowAnonymous]
+    public async Task<ActionResult<object>> GetPlayerById([FromRoute] string id)
     {
         var player = await gameService.GetPlayerById(id);
         if (player == null) return NotFound();
-        return player;
+        return Ok(new
+        {
+            player.Id,
+            player.Name,
+            player.Email,
+            Phonenumber = player.Phonenumber,
+            player.Funds
+        });
     }
 
     [HttpPost]
-    public async Task<Player> CreatePlayer([FromBody] CreatePlayerRequestDto dto)
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<object>> CreatePlayer([FromBody] CreatePlayerRequestDto dto)
     {
-        return await gameService.CreatePlayer(dto);
+        var created = await gameService.CreatePlayer(dto);
+        return Ok(new
+        {
+            created.Id,
+            created.Name,
+            created.Email,
+            Phonenumber = created.Phonenumber,
+            created.Funds,
+            created.Createdat
+        });
     }
 
     [HttpPost("{playerId}/boards")]
-    public async Task<List<Playerboard>> CreateBoards([FromRoute] string playerId, [FromBody] CreatePlayerBoardsRequestDto dto)
+    [Authorize]
+    public async Task<ActionResult<List<Playerboard>>> CreateBoards([FromRoute] string playerId, [FromBody] CreatePlayerBoardsRequestDto dto)
     {
-        return await gameService.CreatePlayerBoards(playerId, dto);
+        var jwt = await authService.VerifyAndDecodeToken(Request.Headers.Authorization.FirstOrDefault());
+        var isAdmin = string.Equals(jwt.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+        if (!isAdmin && !string.Equals(jwt.Id, playerId, StringComparison.Ordinal))
+            return Forbid();
+        var list = await gameService.CreatePlayerBoards(playerId, dto);
+        return Ok(list);
     }
 
     [HttpPatch("{id}")]
-    public async Task<ActionResult<Player>> UpdatePlayer([FromRoute] string id, [FromBody] UpdatePlayerRequestDto dto)
+    [Authorize]
+    public async Task<ActionResult<object>> UpdatePlayer([FromRoute] string id, [FromBody] UpdatePlayerRequestDto dto)
     {
+        var jwt = await authService.VerifyAndDecodeToken(Request.Headers.Authorization.FirstOrDefault());
+        var isAdmin = string.Equals(jwt.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+        if (!isAdmin && !string.Equals(jwt.Id, id, StringComparison.Ordinal))
+            return Forbid();
         var updated = await gameService.UpdatePlayer(id, dto);
-        return Ok(updated);
+        return Ok(new
+        {
+            updated.Id,
+            updated.Name,
+            updated.Email,
+            Phonenumber = updated.Phonenumber,
+            updated.Funds
+        });
     }
 
     [HttpPost("{id}/change-password")]
+    [Authorize(Roles = "User")]
     public async Task<ActionResult> ChangePassword([FromRoute] string id, [FromBody] ChangePasswordRequestDto dto)
     {
         var jwt = await authService.VerifyAndDecodeToken(Request.Headers.Authorization.FirstOrDefault());
@@ -69,16 +118,18 @@ public class PlayersController(IGameService gameService, ISieveProcessor sieve, 
     }
 
     [HttpPatch("{id}/soft-delete")]
-    public async Task<ActionResult<Player>> SoftDelete([FromRoute] string id)
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<object>> SoftDelete([FromRoute] string id)
     {
         var updated = await gameService.SoftDeletePlayer(id);
-        return Ok(updated);
+        return Ok(new { updated.Id, updated.Isdeleted });
     }
 
     [HttpPatch("{id}/restore")]
-    public async Task<ActionResult<Player>> Restore([FromRoute] string id)
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<object>> Restore([FromRoute] string id)
     {
         var updated = await gameService.RestorePlayer(id);
-        return Ok(updated);
+        return Ok(new { updated.Id, updated.Isdeleted });
     }
 }

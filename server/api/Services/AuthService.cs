@@ -9,6 +9,7 @@ using JWT;
 using JWT.Algorithms;
 using JWT.Builder;
 using JWT.Serializers;
+using Microsoft.AspNetCore.Identity;
 using ValidationException = Bogus.ValidationException;
 
 namespace api.Services;
@@ -17,7 +18,8 @@ public class AuthService(
     MyDbContext ctx,
     ILogger<AuthService> logger,
     TimeProvider timeProvider,
-    api.Models.AppOptions appOptions) : IAuthService
+    api.Models.AppOptions appOptions,
+    IPasswordHasher<Player> passwordHasher) : IAuthService
 {
     public async Task<JwtClaims> VerifyAndDecodeToken(string? token)
     {
@@ -42,13 +44,25 @@ public class AuthService(
             throw new ValidationException("Failed to verify JWT");
         }
 
+        using var doc = JsonDocument.Parse(jsonString);
+
+        // Stage 2: Validate expiration if present (use injected TimeProvider for determinism)
+        if (doc.RootElement.TryGetProperty("exp", out var expProp) && expProp.ValueKind == JsonValueKind.Number)
+        {
+            var exp = expProp.GetInt64();
+            var now = timeProvider.GetUtcNow().ToUnixTimeSeconds();
+            if (now >= exp)
+                throw new ValidationException("Token has expired");
+        }
+
         var jwtClaims = JsonSerializer.Deserialize<JwtClaims>(jsonString, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true
         }) ?? throw new ValidationException("Authentication failed!");
 
         // For mock users (when enabled), do not require DB presence
-        if (!(jwtClaims.IsMock && appOptions.EnableMockLogin))
+        var mockAllowed = appOptions.EnableMockLogin || appOptions.EnableMockLoginAdmin || appOptions.EnableMockLoginUser;
+        if (!(jwtClaims.IsMock && mockAllowed))
         {
             var role = (jwtClaims.Role ?? "User").Trim();
             var exists = role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
@@ -64,10 +78,12 @@ public class AuthService(
 
     public async Task<JwtResponse> Login(LoginRequestDto dto)
     {
-        // Mock login fallback
-        if (appOptions.EnableMockLogin)
+        // Mock login fallback (granular control)
+        var allowAdminMock = appOptions.EnableMockLoginAdmin || appOptions.EnableMockLogin;
+        var allowUserMock = appOptions.EnableMockLoginUser || appOptions.EnableMockLogin;
+        if (allowAdminMock || allowUserMock)
         {
-            if (dto.Email.Equals("admin", StringComparison.OrdinalIgnoreCase) && dto.Password == "admin")
+            if (allowAdminMock && dto.Email.Equals("admin", StringComparison.OrdinalIgnoreCase) && dto.Password == "admin")
             {
                 var tokenMockAdmin = CreateJwt(new JwtClaims(
                     Id: "admin-mock",
@@ -76,7 +92,7 @@ public class AuthService(
                     IsMock: true));
                 return new JwtResponse(tokenMockAdmin);
             }
-            if (dto.Email.Equals("user", StringComparison.OrdinalIgnoreCase) && dto.Password == "user")
+            if (allowUserMock && dto.Email.Equals("user", StringComparison.OrdinalIgnoreCase) && dto.Password == "user")
             {
                 var tokenMockUser = CreateJwt(new JwtClaims(
                     Id: "user-mock",
@@ -90,7 +106,7 @@ public class AuthService(
         // Real DB login
         try
         {
-            // Try Admin first
+            // Try Admin first (DB admin path remains as-is; mock admin exists for bootstrap)
             var admin = ctx.Admins.FirstOrDefault(u => u.Email == dto.Email);
             if (admin != null)
             {
@@ -106,9 +122,8 @@ public class AuthService(
             // Then Player
             var player = ctx.Players.FirstOrDefault(u => u.Email == dto.Email)
                          ?? throw new ValidationException("User is not found!");
-            var playerHash = SHA512.HashData(Encoding.UTF8.GetBytes(dto.Password))
-                .Aggregate("", (current, b) => current + b.ToString("x2"));
-            if (player.Passwordhash != playerHash)
+            var verify = passwordHasher.VerifyHashedPassword(player, player.Passwordhash, dto.Password);
+            if (verify == PasswordVerificationResult.Failed)
                 throw new ValidationException("Password is incorrect!");
 
             var token = CreateJwt(new JwtClaims(player.Id, player.Email, "User", false));
@@ -118,7 +133,7 @@ public class AuthService(
         {
             logger.LogError(ex, "Login failed");
             // If DB error and mock login enabled, allow user/user fallback only
-            if (appOptions.EnableMockLogin && dto.Email.Equals("user", StringComparison.OrdinalIgnoreCase) && dto.Password == "user")
+            if ((appOptions.EnableMockLoginUser || appOptions.EnableMockLogin) && dto.Email.Equals("user", StringComparison.OrdinalIgnoreCase) && dto.Password == "user")
             {
                 var tokenMockUser = CreateJwt(new JwtClaims(
                     Id: "user-mock",
@@ -139,8 +154,6 @@ public class AuthService(
         if (isEmailTaken)
             throw new ValidationException("Email is already taken");
 
-        var hash = SHA512.HashData(Encoding.UTF8.GetBytes(dto.Password))
-            .Aggregate("", (current, b) => current + b.ToString("x2"));
         var player = new Player
         {
             Email = dto.Email,
@@ -148,10 +161,11 @@ public class AuthService(
             Phonenumber = "00000000",
             Createdat = timeProvider.GetUtcNow().DateTime.ToUniversalTime(),
             Id = Guid.NewGuid().ToString(),
-            Passwordhash = hash,
+            Passwordhash = string.Empty,
             Funds = 0m,
             Isdeleted = false
         };
+        player.Passwordhash = passwordHasher.HashPassword(player, dto.Password);
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync();
 
@@ -171,11 +185,18 @@ public class AuthService(
 
     private string CreateJwt(JwtClaims claims)
     {
+        var ttlMinutes = appOptions.JwtTtlMinutes <= 0 ? 180 : appOptions.JwtTtlMinutes;
+        var now = timeProvider.GetUtcNow();
+        var exp = now.AddMinutes(ttlMinutes).ToUnixTimeSeconds();
+        var iat = now.ToUnixTimeSeconds();
+
         return CreateJwtBuilder()
             .AddClaim(nameof(JwtClaims.Id), claims.Id)
             .AddClaim(nameof(JwtClaims.Email), claims.Email)
             .AddClaim(nameof(JwtClaims.Role), claims.Role)
             .AddClaim(nameof(JwtClaims.IsMock), claims.IsMock)
+            .AddClaim("iat", iat)
+            .AddClaim("exp", exp)
             .Encode();
     }
 }
