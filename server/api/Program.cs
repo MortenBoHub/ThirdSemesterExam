@@ -39,7 +39,40 @@ public class Program
             opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         });
         services.AddOpenApiDocument();
-        services.AddCors();
+        // CORS
+        services.AddCors(options =>
+        {
+            using var sp = services.BuildServiceProvider();
+            var env = sp.GetRequiredService<IHostEnvironment>();
+            var appOpts = sp.GetRequiredService<AppOptions>();
+
+            options.AddPolicy("Frontend", policy =>
+            {
+                if (env.IsDevelopment())
+                {
+                    policy
+                        .AllowAnyOrigin()
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                }
+                else
+                {
+                    var origins = appOpts.AllowedCorsOrigins ?? Array.Empty<string>();
+                    if (origins.Length > 0)
+                    {
+                        policy
+                            .WithOrigins(origins)
+                            .AllowAnyHeader()
+                            .AllowAnyMethod();
+                    }
+                    else
+                    {
+                        // Block all cross-origin requests by default in Production if not explicitly configured.
+                        policy.SetIsOriginAllowed(_ => false);
+                    }
+                }
+            });
+        });
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IGameService, GameService>();
         // Password hashing for players (Stage 3)
@@ -92,13 +125,12 @@ public class Program
     public static void Main()
     {
         var builder = WebApplication.CreateBuilder();
-		builder.Services.AddCors();
 
         ConfigureServices(builder.Services);
         var app = builder.Build();
         
-
-        app.UseCors(config => config.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin().SetIsOriginAllowed(x => true));
+        // Apply named CORS policy
+        app.UseCors("Frontend");
         
         /* Example endpoint placeholder
         app.MapGet("/", ([FromServices]MyDbContext dbContext) => 

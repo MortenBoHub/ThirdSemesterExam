@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace api.Models;
@@ -15,4 +16,7 @@ public class AppOptions
 
     // Stage 3: configurable token TTL (minutes)
     public int JwtTtlMinutes { get; set; } = 180;
+
+    // Allowed CORS origins (Production). If empty, cross-origin requests are blocked by default in Production.
+    public string[] AllowedCorsOrigins { get; set; } = Array.Empty<string>();
 }
