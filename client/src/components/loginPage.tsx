@@ -21,7 +21,7 @@ export default function LoginPage({ onLogin }: LoginScreenProps) {
 
         // Simple mock authentication
         if (!username || !password) {
-            setError('Indtast brugernavn og kodeord');
+            setError('Indtast Email og kodeord');
             return;
         }
 
@@ -31,7 +31,7 @@ export default function LoginPage({ onLogin }: LoginScreenProps) {
         } else if (username && password) {
             onLogin?.(username, false);
         } else {
-            setError('Ugyldigt brugernavn eller kodeord');
+            setError('Ugyldig Email eller kodeord');
         }
     };
 
@@ -67,14 +67,14 @@ export default function LoginPage({ onLogin }: LoginScreenProps) {
                             <div className="space-y-2">
                                 <label className="text-sm flex items-center space-x-2 text-gray-700">
                                     <User size={16} className="text-[#ed1c24]" />
-                                    <span>Brugernavn</span>
+                                    <span>Email</span>
                                 </label>
                                 <Input
                                     type="text"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     onKeyPress={handleKeyPress}
-                                    placeholder="Indtast brugernavn"
+                                    placeholder="Indtast Email"
                                     className="h-12 text-center border-2 focus:border-[#ed1c24]"
                                     autoFocus
                                 />

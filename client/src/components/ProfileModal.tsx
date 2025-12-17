@@ -350,14 +350,7 @@ export default function ProfileModal({
                                 {/* Users Tab */}
                                 <TabsContent value="users" className="space-y-4 mt-4">
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3>Alle Brugere</h3>
-                                        <Button
-                                            onClick={() => setCreatingUser(true)}
-                                            className="bg-[#ed1c24] hover:bg-[#d11920] text-white px-4 py-2 rounded"
-                                        >
-                                            <Plus size={16} className="mr-2 inline-block" />
-                                            Opret Bruger
-                                        </Button>
+                                        <h3></h3>
                                     </div>
 
                                     <div className="space-y-3">
@@ -451,7 +444,7 @@ export default function ProfileModal({
 
                                 {/* Fund Requests Tab */}
                                 <TabsContent value="requests" className="space-y-4 mt-4">
-                                    <h3>Anmodninger om midler</h3>
+                                    <h3></h3>
 
                                     {users
                                         .flatMap((u) =>
@@ -640,60 +633,50 @@ export default function ProfileModal({
                 />
             )}
 
-            {/* Create User Dialog */}
-            {creatingUser && (
-                <UserCreateDialog
-                    onClose={() => setCreatingUser(false)}
-                    onCreate={handleCreateUser}
-                />
-            )}
-
             {/* Fund Request Dialog */}
             {showFundRequestDialog && (
                 <Dialog open={true} onOpenChange={() => setShowFundRequestDialog(false)}>
-                    <DialogContent className="max-w-md">
+                    <DialogContent className="max-w-md bg-white">
                         <DialogHeader>
                             <DialogTitle>Anmod om midler</DialogTitle>
                             <DialogDescription>
-                                Udfyld beløbet og transaktionsnummeret fra din overførsel.
+                                Udfyld beløbet og transaktionsnummeret fra din overførsel på MobilePay.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="py-4 space-y-4">
-                            <div className="space-y-2">
-                                <label className="text-sm">Beløb (kr)</label>
+                        <div className="py-4 space-y-5">
+                            {/* Amount */}
+                            <div className="flex flex-col space-y-2">
+                                <label className="text-sm text-gray-700">Beløb (kr)</label>
                                 <Input
                                     type="number"
                                     min="1"
                                     value={fundAmount}
                                     onChange={(e) => setFundAmount(e.target.value)}
                                     placeholder="F.eks. 200"
-                                    className="text-lg"
+                                    className="h-12 text-lg"
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm">
-                                    Transaktionsnummer (maks. 20 tegn)
+
+                            {/* Transaction number */}
+                            <div className="flex flex-col space-y-2">
+                                <label className="text-sm text-gray-700">
+                                    Transaktionsnummer
                                 </label>
                                 <Input
                                     type="text"
-                                    maxLength={20}
+                                    maxLength={50}
                                     value={transactionNumber}
                                     onChange={(e) => setTransactionNumber(e.target.value)}
                                     placeholder="F.eks. TXN123456789"
-                                    className="text-lg"
+                                    className="h-12 text-lg"
                                 />
                                 <p className="text-xs text-gray-500">
-                                    {transactionNumber.length}/20 tegn
+                                    {transactionNumber.length}
                                 </p>
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button
-                                onClick={() => setShowFundRequestDialog(false)}
-                                className="px-4 py-2 border border-gray-300 rounded"
-                            >
-                                Annuller
-                            </Button>
+                            
                             <Button
                                 className="px-4 py-2 bg-[#ed1c24] hover:bg-[#d11920] text-white rounded"
                                 onClick={submitFundRequest}
@@ -713,6 +696,12 @@ export default function ProfileModal({
                                     'Send anmodning'
                                 )}
                             </Button>
+                            <Button
+                            onClick={() => setShowFundRequestDialog(false)}
+                            className="px-4 py-2 border border-gray-300 rounded"
+                        >
+                            Annuller
+                        </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>

@@ -133,7 +133,7 @@ export default function AdminPage() {
                     <Input placeholder="Navn" value={playerName} onChange={e=>setPlayerName(e.target.value)} />
                     <Input placeholder="Email" type="email" value={playerEmail} onChange={e=>setPlayerEmail(e.target.value)} />
                     <Input placeholder="Telefon" value={playerPhone} onChange={e=>setPlayerPhone(e.target.value)} />
-                    <Input placeholder="Adgangskode (min 8)" type="password" value={playerPassword} onChange={e=>setPlayerPassword(e.target.value)} />
+                    <Input placeholder="Adgangskode" type="password" value={playerPassword} onChange={e=>setPlayerPassword(e.target.value)} />
                     <Button
                         onClick={async ()=>{
                             try{
@@ -154,7 +154,11 @@ export default function AdminPage() {
                             }
                         }}
                         disabled={!playerName || !playerEmail || !playerPhone || playerPassword.length < 8}
-                    >Opret spiller</Button>
+                        className="w-full bg-[#ed1c24] hover:bg-[#d11920] text-white py-3 rounded-md text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Opret spiller
+                    </Button>
+                    
                 </CardContent>
             </Card>
 
@@ -191,7 +195,7 @@ export default function AdminPage() {
                             </div>
 
                             {/* Manual input */}
-                            <div className="flex items-center justify-center space-x-10 max-w-md mx-auto">
+                            <div className="flex items-center justify-center space-x-15 max-w-md mx-auto">
                                 <Input
                                     type="number"
                                     min={1}
@@ -199,8 +203,9 @@ export default function AdminPage() {
                                     value={manualInput}
                                     onChange={(e) => setManualInput(e.target.value)}
                                     onKeyPress={handleKeyPress}
-                                    placeholder="Indtast nummer (1–16)"
+                                    placeholder="Indtast"
                                     disabled={drawnNumbers.length >= 3}
+                                    className={"text-center pr-15 text-xl"}
                                 />
 
                                 <Button
@@ -217,9 +222,15 @@ export default function AdminPage() {
                                 <div className="text-center">
                                     <Button
                                         onClick={clearDrawnNumbers}
-                                        className="border-[#ed1c24] text-[#ed1c24]"
+                                        className="border border-[#ed1c24]/40
+                                        text-[#ed1c24]
+                                        bg-white
+                                        rounded-xl
+                                        px-6 py-2
+                                         hover:bg-[#ed1c24]/10
+                                         transition"
                                     >
-                                        Nulstil til nyt spil
+                                        Bekræft numre
                                     </Button>
                                 </div>
                             )}
