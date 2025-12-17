@@ -67,6 +67,19 @@ create table dødeduer.drawnnumbers
     drawnBy         text                     not null references dødeduer.admin(id)
 );
 
+-- Fund Requests table
+create table dødeduer.fundrequests
+(
+    id                   text primary key         not null,
+    playerId             text                     not null references dødeduer.player(id),
+    amount               numeric(10, 2)           not null,
+    transactionNumber    text                     not null,
+    status               text                     not null check (status in ('pending','approved','denied')),
+    createdAt            timestamp with time zone not null,
+    processedAt          timestamp with time zone,
+    processedByAdminId   text                     references dødeduer.admin(id)
+);
+
 -- Insert 20 years of boards with placeholders
 create extension if not exists pgcrypto;
 
@@ -92,18 +105,3 @@ DO $$
               AND b.year = to_char(gs, 'IYYY')::int
         );
     END$$;
-
-
--- Fund Requests table
-create table dødeduer.fundrequests
-(
-    id                   text primary key         not null,
-    playerId             text                     not null references dødeduer.player(id),
-    amount               numeric(10, 2)           not null,
-    transactionNumber    text                     not null,
-    status               text                     not null check (status in ('pending','approved','denied')),
-    createdAt            timestamp with time zone not null,
-    processedAt          timestamp with time zone,
-    processedByAdminId   text                     references dødeduer.admin(id)
-);
-

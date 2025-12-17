@@ -131,7 +131,10 @@ public class Program
         app.MapGet("/api/health", () => Results.Ok(new { status = "ok", time = DateTimeOffset.UtcNow }))
             .AllowAnonymous();
         app.MapControllers();
-        app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts").GetAwaiter().GetResult();
+        if (app.Environment.IsDevelopment())
+        {
+            app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts").GetAwaiter().GetResult();
+        }
 
         app.Run();
     }

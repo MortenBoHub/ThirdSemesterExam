@@ -139,7 +139,11 @@ public static class DiExtensions
     public static void AddMyDbContext(this IServiceCollection services)
     {
         var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-        if (environment != "Production")
+        var disableTestcontainers = string.Equals(
+            Environment.GetEnvironmentVariable("DISABLE_TESTCONTAINERS"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+        if (environment != "Production" && !disableTestcontainers)
         {
             var postgreSqlContainer = new PostgreSqlBuilder()
                 .WithDatabase("postgres")

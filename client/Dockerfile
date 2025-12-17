@@ -1,8 +1,18 @@
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+
+# Install dependencies with lockfile for reproducibility
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copy source
 COPY . .
+
+# Build-time API base URL for Vite (can be overridden via Fly build args)
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
+# Build the production bundle
 RUN npm run build
 
 FROM nginx:alpine
