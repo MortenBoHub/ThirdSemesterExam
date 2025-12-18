@@ -1,4 +1,5 @@
 using System.Text;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using dataccess;
@@ -19,7 +20,14 @@ namespace api;
 
 public class Program
 {
+    // Backward-compatible overload for test startup code
     public static void ConfigureServices(IServiceCollection services)
+    {
+        var tmp = WebApplication.CreateBuilder();
+        ConfigureServices(services, tmp.Configuration, tmp.Environment);
+    }
+
+    public static void ConfigureServices(IServiceCollection services, IConfiguration configuration, IHostEnvironment env)
     {
         
         
@@ -42,10 +50,6 @@ public class Program
         // CORS
         services.AddCors(options =>
         {
-            using var sp = services.BuildServiceProvider();
-            var env = sp.GetRequiredService<IHostEnvironment>();
-            var appOpts = sp.GetRequiredService<AppOptions>();
-
             options.AddPolicy("Frontend", policy =>
             {
                 if (env.IsDevelopment())
@@ -57,7 +61,7 @@ public class Program
                 }
                 else
                 {
-                    var origins = appOpts.AllowedCorsOrigins ?? Array.Empty<string>();
+                    var origins = configuration.GetSection("AppOptions:AllowedCorsOrigins").Get<string[]>() ?? Array.Empty<string>();
                     if (origins.Length > 0)
                     {
                         policy
@@ -93,31 +97,35 @@ public class Program
         });
 
         // Authentication & Authorization (Stage 1)
-        // Read JwtSecret from AppOptions (already registered as singleton)
-        using (var sp = services.BuildServiceProvider())
-        {
-            var appOptions = sp.GetRequiredService<AppOptions>();
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appOptions.JwtSecret));
-
-            var isProd = string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Production", StringComparison.OrdinalIgnoreCase);
-            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-                .AddJwtBearer(options =>
+        // Use a single source of truth for JwtSecret from configuration
+        var jwtSecret = configuration["AppOptions:JwtSecret"] ?? "thisisjustadefaultsecretfortestingpurposes";
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.RequireHttpsMetadata = env.IsProduction();
+                options.SaveToken = true;
+                options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    options.RequireHttpsMetadata = isProd;
-                    options.SaveToken = true;
-                    options.TokenValidationParameters = new TokenValidationParameters
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = signingKey,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.FromMinutes(1),
+                    NameClaimType = nameof(Models.JwtClaims.Id), // "Id"
+                    RoleClaimType = nameof(Models.JwtClaims.Role) // "Role"
+                };
+                options.Events = new JwtBearerEvents
+                {
+                    OnAuthenticationFailed = context =>
                     {
-                        ValidateIssuer = false,
-                        ValidateAudience = false,
-                        ValidateIssuerSigningKey = true,
-                        IssuerSigningKey = key,
-                        ValidateLifetime = true,
-                        ClockSkew = TimeSpan.FromMinutes(1),
-                        NameClaimType = nameof(Models.JwtClaims.Id), // "Id"
-                        RoleClaimType = nameof(Models.JwtClaims.Role) // "Role"
-                    };
-                });
-        }
+                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                        logger.LogError(context.Exception, "JWT authentication failed");
+                        return Task.CompletedTask;
+                    }
+                };
+            });
         services.AddAuthorization();
         
     }
@@ -126,7 +134,7 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder();
 
-        ConfigureServices(builder.Services);
+        ConfigureServices(builder.Services, builder.Configuration, builder.Environment);
         var app = builder.Build();
         
         // Apply named CORS policy
@@ -143,6 +151,18 @@ public class Program
         // Safety guard: warn if mock logins are enabled in Production
         var appOptions = app.Services.GetRequiredService<AppOptions>();
         var logger = app.Services.GetRequiredService<ILogger<Program>>();
+        // Log non-reversible fingerprints of JwtSecret for signer/validator parity checks
+        try
+        {
+            var configSecret = app.Configuration["AppOptions:JwtSecret"] ?? string.Empty;
+            var signerHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(appOptions.JwtSecret ?? string.Empty))).ToLowerInvariant();
+            var validatorHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(configSecret))).ToLowerInvariant();
+            logger.LogInformation("JWT secret fingerprints — Signer(AppOptions): {Signer}, Validator(Config): {Validator}", signerHash[..8], validatorHash[..8]);
+        }
+        catch
+        {
+            // no-op
+        }
         if (app.Environment.IsProduction() &&
             (appOptions.EnableMockLogin || appOptions.EnableMockLoginAdmin || appOptions.EnableMockLoginUser))
         {

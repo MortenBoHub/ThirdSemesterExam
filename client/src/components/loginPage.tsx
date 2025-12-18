@@ -4,6 +4,8 @@ import { Button } from './UI/Button';
 import { Input } from './UI/Input';
 import { Card, CardContent, CardHeader, CardTitle } from './UI/Card';
 import { Lock, User } from 'lucide-react';
+import { authApi } from "@utilities/authApi.ts";
+import toast from "react-hot-toast";
 
 interface LoginScreenProps {
     // made optional so you can use <LoginPage /> without passing it yet
@@ -14,24 +16,34 @@ export default function LoginPage({ onLogin }: LoginScreenProps) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
-        // Simple mock authentication
         if (!username || !password) {
             setError('Indtast Email og kodeord');
             return;
         }
 
-        // Mock: admin/admin for admin access, any other credentials for user access
-        if (username.toLowerCase() === 'admin' && password === 'admin') {
-            onLogin?.(username, true);
-        } else if (username && password) {
+        try {
+            setLoading(true);
+            const res = await authApi.login({ email: username, password });
+            if (!res?.token) {
+                throw new Error('Login mislykkedes');
+            }
+            localStorage.setItem('jwt', res.token);
+            toast.success('Logget ind');
+            // Notify parent so it can call whoAmI() and update app state
             onLogin?.(username, false);
-        } else {
-            setError('Ugyldig Email eller kodeord');
+        } catch (err: any) {
+            // Best-effort message
+            const msg = err?.message || 'Ugyldig Email eller kodeord';
+            setError(msg);
+            toast.error(msg);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -107,10 +119,11 @@ export default function LoginPage({ onLogin }: LoginScreenProps) {
                         {/* Login button */}
                         <Button
                             type="submit"
-                            className="w-full h-12 flex items-center justify-center bg-[#ed1c24] hover:bg-[#d11920] transition-all shadow-md hover:shadow-lg text-lg"
+                            disabled={loading}
+                            className="w-full h-12 flex items-center justify-center bg-[#ed1c24] hover:bg-[#d11920] transition-all shadow-md hover:shadow-lg text-lg disabled:opacity-60 disabled:cursor-not-allowed"
 
                         >
-                            Log ind
+                            {loading ? 'Logger ind…' : 'Log ind'}
                         </Button>
 
                         

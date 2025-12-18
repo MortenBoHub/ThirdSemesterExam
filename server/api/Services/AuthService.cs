@@ -10,6 +10,9 @@ using JWT.Algorithms;
 using JWT.Builder;
 using JWT.Serializers;
 using Microsoft.AspNetCore.Identity;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using ValidationException = Bogus.ValidationException;
 
 namespace api.Services;
@@ -30,42 +33,52 @@ public class AuthService(
         if (token.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
             token = token.Substring("Bearer ".Length).Trim();
 
-        var builder = CreateJwtBuilder();
+        // Validate token using the same secret/algorithm family as the JwtBearer middleware
+        var handler = new JwtSecurityTokenHandler();
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appOptions.JwtSecret));
+        var validationParams = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = key,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+            NameClaimType = nameof(JwtClaims.Id),
+            RoleClaimType = nameof(JwtClaims.Role)
+        };
 
-        string jsonString;
+        ClaimsPrincipal principal;
         try
         {
-            jsonString = builder.Decode(token)
-                         ?? throw new ValidationException("Authentication failed!");
+            principal = handler.ValidateToken(token, validationParams, out _);
         }
         catch (Exception e)
         {
-            logger.LogError(e, e.Message);
+            logger.LogError(e, "Failed to validate JWT token");
             throw new ValidationException("Failed to verify JWT");
         }
 
-        using var doc = JsonDocument.Parse(jsonString);
+        // Map claims
+        var id = principal.FindFirst(nameof(JwtClaims.Id))?.Value;
+        var email = principal.FindFirst(nameof(JwtClaims.Email))?.Value;
+        var role = principal.FindFirst(nameof(JwtClaims.Role))?.Value ?? "User";
+        var isMockStr = principal.FindFirst(nameof(JwtClaims.IsMock))?.Value;
+        bool isMock = false;
+        if (!string.IsNullOrWhiteSpace(isMockStr))
+            bool.TryParse(isMockStr, out isMock);
 
-        // Stage 2: Validate expiration if present (use injected TimeProvider for determinism)
-        if (doc.RootElement.TryGetProperty("exp", out var expProp) && expProp.ValueKind == JsonValueKind.Number)
-        {
-            var exp = expProp.GetInt64();
-            var now = timeProvider.GetUtcNow().ToUnixTimeSeconds();
-            if (now >= exp)
-                throw new ValidationException("Token has expired");
-        }
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(email))
+            throw new ValidationException("Authentication failed!");
 
-        var jwtClaims = JsonSerializer.Deserialize<JwtClaims>(jsonString, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        }) ?? throw new ValidationException("Authentication failed!");
+        var jwtClaims = new JwtClaims(id, email, role, isMock);
 
         // For mock users (when enabled), do not require DB presence
         var mockAllowed = appOptions.EnableMockLogin || appOptions.EnableMockLoginAdmin || appOptions.EnableMockLoginUser;
         if (!(jwtClaims.IsMock && mockAllowed))
         {
-            var role = (jwtClaims.Role ?? "User").Trim();
-            var exists = role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
+            var roleNorm = (jwtClaims.Role ?? "User").Trim();
+            var exists = roleNorm.Equals("Admin", StringComparison.OrdinalIgnoreCase)
                 ? ctx.Admins.Any(u => u.Id == jwtClaims.Id)
                 : ctx.Players.Any(u => u.Id == jwtClaims.Id);
 
@@ -186,17 +199,27 @@ public class AuthService(
     private string CreateJwt(JwtClaims claims)
     {
         var ttlMinutes = appOptions.JwtTtlMinutes <= 0 ? 180 : appOptions.JwtTtlMinutes;
-        var now = timeProvider.GetUtcNow();
-        var exp = now.AddMinutes(ttlMinutes).ToUnixTimeSeconds();
-        var iat = now.ToUnixTimeSeconds();
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        return CreateJwtBuilder()
-            .AddClaim(nameof(JwtClaims.Id), claims.Id)
-            .AddClaim(nameof(JwtClaims.Email), claims.Email)
-            .AddClaim(nameof(JwtClaims.Role), claims.Role)
-            .AddClaim(nameof(JwtClaims.IsMock), claims.IsMock)
-            .AddClaim("iat", iat)
-            .AddClaim("exp", exp)
-            .Encode();
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(appOptions.JwtSecret));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512);
+
+        var nowEpoch = new DateTimeOffset(now).ToUnixTimeSeconds().ToString();
+
+        var jwt = new JwtSecurityToken(
+            claims: new[]
+            {
+                new Claim(nameof(JwtClaims.Id), claims.Id),
+                new Claim(nameof(JwtClaims.Email), claims.Email),
+                new Claim(nameof(JwtClaims.Role), claims.Role),
+                new Claim(nameof(JwtClaims.IsMock), claims.IsMock.ToString()),
+                new Claim(JwtRegisteredClaimNames.Iat, nowEpoch, ClaimValueTypes.Integer64)
+            },
+            notBefore: now,
+            expires: now.AddMinutes(ttlMinutes),
+            signingCredentials: creds
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(jwt);
     }
 }
