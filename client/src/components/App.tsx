@@ -15,6 +15,7 @@ import type { JwtClaims } from "@core/generated-client.ts";
 import { Navigate } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
+import { Routes, Route} from "react-router-dom";
 //import Auth from "@components/routes/auth/Auth.tsx";
 
 function RequireAuth(props: { isAuthed: boolean; children: React.ReactElement }) {
@@ -64,28 +65,6 @@ export default function App() {
         if (!claims) {
             return <LoginPage onLogin={() => authApi.whoAmI().then(setClaims)} />;
         }
-
-        const router = createBrowserRouter([
-            { path: "/", element: <Home /> },
-            { path: "/login", element: <LoginPage onLogin={() => authApi.whoAmI().then(setClaims)} /> },
-            { path: "/user",
-                element: (
-                    <RequireAuth isAuthed={!!claims}>
-                        <UserView />
-                    </RequireAuth>
-                ),
-            },
-            {
-                path: "/admin",
-                element: (
-                    <RequireAuth isAuthed={!!claims}>
-                        <RequireAdmin isAdmin={isAdminRole}>
-                            <AdminPage />
-                        </RequireAdmin>
-                    </RequireAuth>
-                ),
-            },
-        ]);
 
         return (
         <>
@@ -156,8 +135,36 @@ export default function App() {
 
                 {/* Main Content */}
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <RouterProvider router={router} />
-                </main>
+                <Routes>
+                    <Route
+                        path="/"
+                        element={claims ? <Navigate to="/user" replace /> : <Navigate to="/login" replace />}
+                    />
+                    <Route
+                        path="/login"
+                        element={<LoginPage onLogin={() => authApi.whoAmI().then(setClaims)} />}
+                    />
+                    <Route
+                        path="/user"
+                        element={
+                            <RequireAuth isAuthed={!!claims}>
+                                <UserView />
+                            </RequireAuth>
+                        }
+                    />
+                    <Route
+                        path="/admin"
+                        element={
+                            <RequireAuth isAuthed={!!claims}>
+                                <RequireAdmin isAdmin={isAdminRole}>
+                                    <AdminPage />
+                                </RequireAdmin>
+                            </RequireAuth>
+                        }
+                    />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </main>
 
                 {/* Profile Modal */}
                 {showProfile && (
