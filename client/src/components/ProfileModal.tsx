@@ -381,7 +381,6 @@ export default function ProfileModal({
                                                                 <p className="text-sm text-gray-600">{user.phone}</p>
                                                                 <div className="flex items-center space-x-3 mt-2">
                                                                     <div className="flex items-center space-x-2">
-                                                                        <DollarSign size={16} className="text-green-600" />
                                                                         <span className="text-sm">{user.funds} kr</span>
                                                                     </div>
                                                                     <Button
@@ -870,7 +869,7 @@ function UserEditDialog({
 
     return (
         <Dialog open={true} onOpenChange={onClose}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md bg-white">
                 <DialogHeader>
                     <DialogTitle>Rediger Bruger</DialogTitle>
                     <DialogDescription>
