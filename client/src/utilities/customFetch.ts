@@ -13,7 +13,7 @@ export const customFetch = {
         const headers = new Headers(init?.headers);
 
         if (token) {
-            headers.set('Authorization', token);
+            headers.set('Authorization', `Bearer ${token}`);
         }
 
         return fetch(url, {

@@ -786,7 +786,7 @@ function ProfileInfoTab({
             <Card className="border-2 border-[#ed1c24]/20">
                 <CardHeader className="bg-gradient-to-r from-[#ed1c24]/5 to-transparent">
                     <CardTitle className="text-[#ed1c24] flex items-center space-x-2">
-                        <DollarSign size={24} />
+                        <span>Kr.</span>
                         <span>Saldo</span>
                     </CardTitle>
                 </CardHeader>

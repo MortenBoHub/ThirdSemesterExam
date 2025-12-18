@@ -1,4 +1,4 @@
-import {createBrowserRouter, RouterProvider} from "react-router";
+import {createBrowserRouter, RouterProvider} from "react-router-dom";
 import Home from "@components/Home.tsx";
 import {DevTools} from "jotai-devtools";
 //import 'jotai-devtools/styles.css'
@@ -9,32 +9,85 @@ import AdminPage from "./adminPage";
 import ProfileModal from "./ProfileModal";
 import { User, Users, LogOut } from 'lucide-react';
 import {useState} from "react";
+import { useEffect } from "react";
+import { authApi } from "../utilities/authApi";
+import type { JwtClaims } from "@core/generated-client.ts";
+import { Navigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 //import Auth from "@components/routes/auth/Auth.tsx";
 
-    export default function App() {
-        const [username, setUsername] = useState<string | null>(null);
-        const [isAdmin, setIsAdmin] = useState(false);
-        const [userType, setUserType] = useState<'user' | 'admin'>('user');
+function RequireAuth(props: { isAuthed: boolean; children: React.ReactElement }) {
+    return props.isAuthed ? props.children : <Navigate to="/login" replace />;
+}
+
+function RequireAdmin(props: { isAdmin: boolean; children: React.ReactElement }) {
+    return props.isAdmin ? props.children : <Navigate to="/user" replace />;
+}
+export default function App() {
         const [showProfile, setShowProfile] = useState(false);
         const [showUserManagement, setShowUserManagement] = useState(false);
+        const [claims, setClaims] = useState<JwtClaims | null>(null);
+        const [authChecked, setAuthChecked] = useState(false);
+        const isAdminRole = claims?.role === "Admin";
+        const navigate = useNavigate();
+        const location = useLocation();
+        const path = location.pathname;
+        
+        useEffect(() => {
+            const token = localStorage.getItem("jwt");
 
-        const handleLogin = (user: string, admin: boolean) => {
-            setUsername(user);
-            setIsAdmin(admin);
-            setUserType(admin ? 'admin' : 'user');
-        };
+            if (!token) {
+                setAuthChecked(true);
+                return;
+            }
 
+            authApi
+                .whoAmI()
+                .then((c) => setClaims(c))
+                .catch(() => {
+                    localStorage.removeItem("jwt");
+                    setClaims(null);
+                })
+                .finally(() => setAuthChecked(true));
+        }, []);
         const handleLogout = () => {
-            setUsername(null);
-            setIsAdmin(false);
+            localStorage.removeItem("jwt");
+            setClaims(null);
         };
 
         // Show login screen if not logged in
-        if (!username) {
-            return <LoginPage onLogin={handleLogin} />;
+        if (!authChecked) {
+            return <div className="p-6">Loading...</div>;
         }
-    
-    return (
+
+        if (!claims) {
+            return <LoginPage onLogin={() => authApi.whoAmI().then(setClaims)} />;
+        }
+
+        const router = createBrowserRouter([
+            { path: "/", element: <Home /> },
+            { path: "/login", element: <LoginPage onLogin={() => authApi.whoAmI().then(setClaims)} /> },
+            { path: "/user",
+                element: (
+                    <RequireAuth isAuthed={!!claims}>
+                        <UserView />
+                    </RequireAuth>
+                ),
+            },
+            {
+                path: "/admin",
+                element: (
+                    <RequireAuth isAuthed={!!claims}>
+                        <RequireAdmin isAdmin={isAdminRole}>
+                            <AdminPage />
+                        </RequireAdmin>
+                    </RequireAuth>
+                ),
+            },
+        ]);
+
+        return (
         <>
             <div className="min-h-screen bg-[#f5f1e8]">
                 {/* Navigation */}
@@ -45,9 +98,9 @@ import {useState} from "react";
                                 <h1 className="text-[#ed1c24]">🎯 Døde Duer</h1>
                                 <div className="flex space-x-4">
                                     <button
-                                        onClick={() => setUserType('user')}
+                                        onClick={() => navigate("/user")}
                                         className={`px-4 py-2 rounded-md transition-colors ${
-                                            userType === 'user'
+                                            path === "/user"
                                                 ? 'bg-[#ed1c24] text-white'
                                                 : 'text-gray-700 hover:bg-gray-100'
                                         }`}
@@ -55,16 +108,18 @@ import {useState} from "react";
                                         Spil
                                     </button>
                                     <button
-                                        onClick={() => setUserType('admin')}
+                                        onClick={() => {
+                                            if (isAdminRole) navigate("/admin");
+                                        }}
                                         className={`px-4 py-2 rounded-md transition-colors ${
-                                            userType === 'admin' && !showUserManagement
+                                            path === "/admin" && !showUserManagement
                                                 ? 'bg-[#ed1c24] text-white'
                                                 : 'text-gray-700 hover:bg-gray-100'
                                         }`}
                                     >
                                         Administrer spillere
                                     </button>
-                                    {userType === 'admin' && (
+                                    {isAdminRole && path === "/admin" && (
                                         <button
                                             onClick={() => setShowUserManagement(true)}
                                             className={`px-4 py-2 rounded-md transition-colors flex items-center space-x-2 ${
@@ -101,13 +156,13 @@ import {useState} from "react";
 
                 {/* Main Content */}
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    {userType === 'user' ? <UserView /> : <AdminPage />}
+                    <RouterProvider router={router} />
                 </main>
 
                 {/* Profile Modal */}
                 {showProfile && (
                     <ProfileModal
-                        isAdmin={userType === 'admin'}
+                        isAdmin={isAdminRole}
                         onClose={() => setShowProfile(false)}
                         showUserManagement={showUserManagement}
                         onCloseUserManagement={() => setShowUserManagement(false)}
@@ -115,9 +170,9 @@ import {useState} from "react";
                 )}
 
                 {/* User Management Modal (Admin Only) */}
-                {showUserManagement && userType === 'admin' && (
+                {showUserManagement && isAdminRole && path === "/admin" && (
                     <ProfileModal
-                        isAdmin={true}
+                        isAdmin={isAdminRole}
                         onClose={() => setShowUserManagement(false)}
                         showUserManagement={true}
                         onCloseUserManagement={() => setShowUserManagement(false)}
