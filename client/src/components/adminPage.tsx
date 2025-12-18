@@ -6,6 +6,14 @@ import { Button } from "./UI/Button";
 import { Input } from "./UI/Input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./UI/Tabs";
 import { Badge } from "./UI/Badge";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "./UI/Dialog";
 
 import { Users, Trophy, History } from "lucide-react";
 import { playersApi } from "@utilities/playersApi.ts";
@@ -26,6 +34,8 @@ export default function AdminPage() {
     const [playerEmail, setPlayerEmail] = useState("");
     const [playerPhone, setPlayerPhone] = useState("");
     const [playerPassword, setPlayerPassword] = useState("");
+    const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+    const [createdPlayerName, setCreatedPlayerName] = useState("");
 
     const handleManualDraw = () => {
         const num = parseInt(manualInput);
@@ -143,7 +153,8 @@ export default function AdminPage() {
                                     phoneNumber: playerPhone,
                                     password: playerPassword
                                 });
-                                toast.success(`Spiller oprettet: ${res.name}`);
+                                setCreatedPlayerName(res.name);
+                                setShowSuccessDialog(true);
                                 // clear
                                 setPlayerName("");
                                 setPlayerEmail("");
@@ -161,6 +172,28 @@ export default function AdminPage() {
                     
                 </CardContent>
             </Card>
+
+            <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-green-600 flex items-center gap-2">
+                            <span>✅ Succes!</span>
+                        </DialogTitle>
+                        <DialogDescription className="text-lg pt-2">
+                            Spilleren <strong>{createdPlayerName}</strong> er blevet oprettet succesfuldt.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="sm:justify-center pt-4">
+                        <Button
+                            type="button"
+                            className="bg-[#ed1c24] hover:bg-[#d11920] text-white px-8"
+                            onClick={() => setShowSuccessDialog(false)}
+                        >
+                            OK
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* TABS */}
             <Tabs defaultValue="draw" className="w-full">

@@ -123,6 +123,24 @@ public class Program
                         var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
                         logger.LogError(context.Exception, "JWT authentication failed");
                         return Task.CompletedTask;
+                    },
+                    OnTokenValidated = async context =>
+                    {
+                        var db = context.HttpContext.RequestServices.GetRequiredService<dataccess.MyDbContext>();
+                        var id = context.Principal?.FindFirst(nameof(api.Models.JwtClaims.Id))?.Value;
+                        var role = context.Principal?.FindFirst(nameof(api.Models.JwtClaims.Role))?.Value;
+                        var isMock = context.Principal?.FindFirst(nameof(api.Models.JwtClaims.IsMock))?.Value == "True";
+
+                        if (string.IsNullOrEmpty(id) || isMock) return;
+
+                        bool isDeleted = role == "Admin" 
+                            ? await db.Admins.AnyAsync(a => a.Id == id && a.Isdeleted)
+                            : await db.Players.AnyAsync(p => p.Id == id && p.Isdeleted);
+
+                        if (isDeleted)
+                        {
+                            context.Fail("User is deleted");
+                        }
                     }
                 };
             });

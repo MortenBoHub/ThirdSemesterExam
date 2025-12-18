@@ -46,7 +46,7 @@ public class AuthServiceTests
         var svc = CreateAuthService(ctx, new AppOptions
         {
             Db = "inmemory",
-            JwtSecret = "secret-1",
+            JwtSecret = "test-secret-1234567890-very-long-secret-to-satisfy-hs512-requirements-1",
             EnableMockLogin = false,
             EnableMockLoginAdmin = false,
             EnableMockLoginUser = false,
@@ -75,7 +75,7 @@ public class AuthServiceTests
         var svcWithMock = CreateAuthService(ctx1, new AppOptions
         {
             Db = "inmemory",
-            JwtSecret = "secret-3",
+            JwtSecret = "test-secret-1234567890-very-long-secret-to-satisfy-hs512-requirements-3",
             EnableMockLogin = false,
             EnableMockLoginAdmin = true,
             EnableMockLoginUser = false,
@@ -88,7 +88,7 @@ public class AuthServiceTests
         var svcNoMock = CreateAuthService(ctx2, new AppOptions
         {
             Db = "inmemory",
-            JwtSecret = "secret-4",
+            JwtSecret = "test-secret-1234567890-very-long-secret-to-satisfy-hs512-requirements-4",
             EnableMockLogin = false,
             EnableMockLoginAdmin = false,
             EnableMockLoginUser = false,
@@ -105,7 +105,7 @@ public class AuthServiceTests
         var auth = CreateAuthService(ctx, new AppOptions
         {
             Db = "inmemory",
-            JwtSecret = "secret-cp",
+            JwtSecret = "test-secret-1234567890-very-long-secret-to-satisfy-hs512-requirements-cp",
             EnableMockLogin = false,
             EnableMockLoginAdmin = false,
             EnableMockLoginUser = false,
@@ -151,7 +151,7 @@ public class AuthServiceTests
         var opts = new AppOptions
         {
             Db = "inmemory",
-            JwtSecret = "secret-exp",
+            JwtSecret = "test-secret-1234567890-very-long-secret-to-satisfy-hs512-requirements-exp",
             EnableMockLogin = false,
             EnableMockLoginAdmin = false,
             EnableMockLoginUser = false,
@@ -168,8 +168,8 @@ public class AuthServiceTests
         var claimsOk = await svc.VerifyAndDecodeToken(reg.Token);
         Assert.Equal("User", claimsOk.Role);
 
-        // After expiry -> throws
-        fake.Advance(TimeSpan.FromSeconds(2));
+        // After expiry + clock skew -> throws
+        fake.Advance(TimeSpan.FromMinutes(2));
         await Assert.ThrowsAsync<Bogus.ValidationException>(async () => await svc.VerifyAndDecodeToken(reg.Token));
     }
 }

@@ -45,7 +45,16 @@ public class AuthService(
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1),
             NameClaimType = nameof(JwtClaims.Id),
-            RoleClaimType = nameof(JwtClaims.Role)
+            RoleClaimType = nameof(JwtClaims.Role),
+            LifetimeValidator = (notBefore, expires, securityToken, validationParameters) =>
+            {
+                var now = timeProvider.GetUtcNow().UtcDateTime;
+                if (notBefore.HasValue && notBefore.Value > now + validationParameters.ClockSkew)
+                    return false;
+                if (expires.HasValue && expires.Value < now - validationParameters.ClockSkew)
+                    return false;
+                return true;
+            }
         };
 
         ClaimsPrincipal principal;
@@ -78,12 +87,22 @@ public class AuthService(
         if (!(jwtClaims.IsMock && mockAllowed))
         {
             var roleNorm = (jwtClaims.Role ?? "User").Trim();
-            var exists = roleNorm.Equals("Admin", StringComparison.OrdinalIgnoreCase)
-                ? ctx.Admins.Any(u => u.Id == jwtClaims.Id)
-                : ctx.Players.Any(u => u.Id == jwtClaims.Id);
-
-            if (!exists)
-                throw new ValidationException("Authentication is valid, but user is not found!");
+            if (roleNorm.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                var admin = ctx.Admins.FirstOrDefault(u => u.Id == jwtClaims.Id);
+                if (admin == null)
+                    throw new ValidationException("Authentication is valid, but user is not found!");
+                if (admin.Isdeleted)
+                    throw new ValidationException("User is deleted!");
+            }
+            else
+            {
+                var player = ctx.Players.FirstOrDefault(u => u.Id == jwtClaims.Id);
+                if (player == null)
+                    throw new ValidationException("Authentication is valid, but user is not found!");
+                if (player.Isdeleted)
+                    throw new ValidationException("User is deleted!");
+            }
         }
 
         return jwtClaims;
@@ -123,6 +142,9 @@ public class AuthService(
             var admin = ctx.Admins.FirstOrDefault(u => u.Email == dto.Email);
             if (admin != null)
             {
+                if (admin.Isdeleted)
+                    throw new ValidationException("User is deleted!");
+
                 var adminHash = SHA512.HashData(Encoding.UTF8.GetBytes(dto.Password))
                     .Aggregate("", (current, b) => current + b.ToString("x2"));
                 if (admin.Passwordhash != adminHash)
@@ -135,6 +157,9 @@ public class AuthService(
             // Then Player
             var player = ctx.Players.FirstOrDefault(u => u.Email == dto.Email)
                          ?? throw new ValidationException("User is not found!");
+
+            if (player.Isdeleted)
+                throw new ValidationException("User is deleted!");
             var verify = passwordHasher.VerifyHashedPassword(player, player.Passwordhash, dto.Password);
             if (verify == PasswordVerificationResult.Failed)
                 throw new ValidationException("Password is incorrect!");

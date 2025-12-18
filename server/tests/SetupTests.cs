@@ -26,7 +26,7 @@ public class SetupTests
         var opts = new AppOptions
         {
             Db = "inmemory",
-            JwtSecret = "test-secret-1234567890",
+            JwtSecret = "test-secret-1234567890-very-long-secret-to-satisfy-hs512-requirements",
             EnableMockLogin = false,
             EnableMockLoginAdmin = false,
             EnableMockLoginUser = false,

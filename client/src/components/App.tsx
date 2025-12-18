@@ -86,18 +86,20 @@ export default function App() {
                                     >
                                         Spil
                                     </button>
-                                    <button
-                                        onClick={() => {
-                                            if (isAdminRole) navigate("/admin");
-                                        }}
-                                        className={`px-4 py-2 rounded-md transition-colors ${
-                                            path === "/admin" && !showUserManagement
-                                                ? 'bg-[#ed1c24] text-white'
-                                                : 'text-gray-700 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        Administrer spillere
-                                    </button>
+                                    {isAdminRole && (
+                                        <button
+                                            onClick={() => {
+                                                if (isAdminRole) navigate("/admin");
+                                            }}
+                                            className={`px-4 py-2 rounded-md transition-colors ${
+                                                path === "/admin" && !showUserManagement
+                                                    ? 'bg-[#ed1c24] text-white'
+                                                    : 'text-gray-700 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            Administrer spillere
+                                        </button>
+                                    )}
                                     {isAdminRole && path === "/admin" && (
                                         <button
                                             onClick={() => setShowUserManagement(true)}
