@@ -1,0 +1,33 @@
+﻿name: Backend Lint & Format
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - '.editorconfig'
+  pull_request:
+    paths:
+      - 'server/**'
+      - '.editorconfig'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore ProjectSolution.sln
+
+      - name: Build
+        run: dotnet build ProjectSolution.sln --no-restore --nologo
+
+      - name: Verify formatting
+        run: dotnet format --verify-no-changes
