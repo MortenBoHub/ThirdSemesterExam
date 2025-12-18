@@ -12,33 +12,123 @@ namespace JerneIF.Tests;
 
 public class GameServiceTests
 {
-    private static MyDbContext CreateDbContext()
+    private readonly IGameService _gameService;
+    private readonly MyDbContext _context;
+    private readonly FakeTimeProvider _fakeTimeProvider;
+
+    public GameServiceTests(IGameService gameService, MyDbContext context, FakeTimeProvider fakeTimeProvider)
     {
-        var options = new DbContextOptionsBuilder<MyDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        var ctx = new MyDbContext(options);
-        ctx.Database.EnsureCreated();
-        return ctx;
+        _gameService = gameService;
+        _context = context;
+        _fakeTimeProvider = fakeTimeProvider;
+        
+        // Ensure isolation by cleaning up boards and players before each test
+        _context.Playerboardnumbers.RemoveRange(_context.Playerboardnumbers);
+        _context.Playerboards.RemoveRange(_context.Playerboards);
+        _context.Boards.RemoveRange(_context.Boards);
+        _context.Players.RemoveRange(_context.Players);
+        _context.Admins.RemoveRange(_context.Admins);
+        _context.Fundrequests.RemoveRange(_context.Fundrequests);
+        _context.Drawnnumbers.RemoveRange(_context.Drawnnumbers);
+        _context.SaveChanges();
     }
 
-    private static GameService CreateGameService(MyDbContext ctx, FakeTimeProvider? ftp = null)
+    [Fact]
+    public async Task CreatePlayerBoards_DeductsFunds_BasedOnNumberCount()
     {
-        var time = (TimeProvider)(ftp ?? new FakeTimeProvider(DateTimeOffset.UtcNow));
-        var hasher = new Api.Security.BcryptPasswordHasher();
-        return new GameService(ctx, time, hasher);
+        // Seed player with some funds
+        var player = new Player
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = "Rich Player",
+            Email = $"rich{Guid.NewGuid()}@example.com",
+            Phonenumber = "123",
+            Passwordhash = "x",
+            Createdat = _fakeTimeProvider.GetUtcNow().UtcDateTime,
+            Funds = 1000m,
+            Isdeleted = false
+        };
+        _context.Players.Add(player);
+
+        var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
+        var year = System.Globalization.ISOWeek.GetYear(now);
+        var week = System.Globalization.ISOWeek.GetWeekOfYear(now);
+        var board = new Board { Id = Guid.NewGuid().ToString(), Year = year, Weeknumber = week, Isactive = true, Createdat = now };
+        _context.Boards.Add(board);
+        await _context.SaveChangesAsync();
+
+        // 5 numbers -> 20kr
+        await _gameService.CreatePlayerBoards(player.Id, new CreatePlayerBoardsRequestDto { SelectedNumbers = new() { 1, 2, 3, 4, 5 }, RepeatWeeks = 1 });
+        var reloaded = await _context.Players.FirstAsync(p => p.Id == player.Id);
+        Assert.Equal(980m, reloaded.Funds);
+
+        // 8 numbers -> 160kr
+        await _gameService.CreatePlayerBoards(player.Id, new CreatePlayerBoardsRequestDto { SelectedNumbers = new() { 1, 2, 3, 4, 5, 6, 7, 8 }, RepeatWeeks = 1 });
+        reloaded = await _context.Players.FirstAsync(p => p.Id == player.Id);
+        Assert.Equal(820m, reloaded.Funds);
+    }
+
+    [Fact]
+    public async Task CreatePlayerBoards_InsufficientFunds_Throws()
+    {
+        var player = new Player
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = "Poor Player",
+            Email = $"poor{Guid.NewGuid()}@example.com",
+            Phonenumber = "123",
+            Passwordhash = "x",
+            Createdat = _fakeTimeProvider.GetUtcNow().UtcDateTime,
+            Funds = 10m,
+            Isdeleted = false
+        };
+        _context.Players.Add(player);
+
+        var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
+        var year = System.Globalization.ISOWeek.GetYear(now);
+        var week = System.Globalization.ISOWeek.GetWeekOfYear(now);
+        var board = new Board { Id = Guid.NewGuid().ToString(), Year = year, Weeknumber = week, Isactive = true, Createdat = now };
+        _context.Boards.Add(board);
+        await _context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(async () =>
+            await _gameService.CreatePlayerBoards(player.Id, new CreatePlayerBoardsRequestDto { SelectedNumbers = new() { 1, 2, 3, 4, 5 }, RepeatWeeks = 1 }));
+    }
+
+    [Fact]
+    public async Task GetActiveBoard_Handles_NullDates()
+    {
+        var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
+        var year = System.Globalization.ISOWeek.GetYear(now);
+        var week = System.Globalization.ISOWeek.GetWeekOfYear(now);
+        
+        // Board with null dates
+        var board = new Board 
+        { 
+            Id = Guid.NewGuid().ToString(), 
+            Year = year, 
+            Weeknumber = week, 
+            Isactive = true, 
+            Createdat = now,
+            Startdate = null,
+            Enddate = null
+        };
+        _context.Boards.Add(board);
+        await _context.SaveChangesAsync();
+
+        var active = await _gameService.GetActiveBoard();
+        Assert.NotNull(active);
+        Assert.Null(active.Startdate);
+        Assert.Null(active.Enddate);
     }
 
     [Fact]
     public async Task CreatePlayer_HashesPassword_And_EnforcesUniqueEmail()
     {
-        await using var ctx = CreateDbContext();
-        var svc = CreateGameService(ctx);
-
-        var p1 = await svc.CreatePlayer(new CreatePlayerRequestDto
+        var p1 = await _gameService.CreatePlayer(new CreatePlayerRequestDto
         {
             Name = "A",
-            Email = "a@example.com",
+            Email = $"a{Guid.NewGuid()}@example.com",
             PhoneNumber = "12345",
             Password = "Password123!"
         });
@@ -47,10 +137,10 @@ public class GameServiceTests
 
         await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(async () =>
         {
-            await svc.CreatePlayer(new CreatePlayerRequestDto
+            await _gameService.CreatePlayer(new CreatePlayerRequestDto
             {
                 Name = "B",
-                Email = "a@example.com",
+                Email = p1.Email,
                 PhoneNumber = "12345",
                 Password = "AnotherPass!"
             });
@@ -60,95 +150,298 @@ public class GameServiceTests
     [Fact]
     public async Task CreatePlayerBoards_Validates_And_CreatesForFutureWeeks()
     {
-        await using var ctx = CreateDbContext();
-        var ftp = new FakeTimeProvider(DateTimeOffset.UtcNow);
-        var svc = CreateGameService(ctx, ftp);
-
         // Seed player
         var player = new Player
         {
             Id = Guid.NewGuid().ToString(),
             Name = "P",
-            Email = "p@example.com",
+            Email = $"p{Guid.NewGuid()}@example.com",
             Phonenumber = "11111",
             Passwordhash = "x",
-            Createdat = ftp.GetUtcNow().UtcDateTime,
-            Funds = 0m,
+            Createdat = _fakeTimeProvider.GetUtcNow().UtcDateTime,
+            Funds = 1000m,
             Isdeleted = false
         };
-        ctx.Players.Add(player);
+        _context.Players.Add(player);
 
         // Seed two future boards relative to now
-        var now = ftp.GetUtcNow().UtcDateTime;
+        var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
         var year = System.Globalization.ISOWeek.GetYear(now);
         var week = System.Globalization.ISOWeek.GetWeekOfYear(now);
         var b1 = new Board { Id = Guid.NewGuid().ToString(), Year = year, Weeknumber = week, Isactive = true, Createdat = now, Startdate = now, Enddate = now.AddDays(6) };
         var b2 = new Board { Id = Guid.NewGuid().ToString(), Year = year, Weeknumber = week + 1, Isactive = false, Createdat = now.AddDays(7), Startdate = now.AddDays(7), Enddate = now.AddDays(13) };
-        ctx.Boards.AddRange(b1, b2);
-        await ctx.SaveChangesAsync();
+        _context.Boards.AddRange(b1, b2);
+        await _context.SaveChangesAsync();
 
         // Invalid numbers
         await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(async () =>
-            await svc.CreatePlayerBoards(player.Id, new CreatePlayerBoardsRequestDto { SelectedNumbers = new() { 1, 2, 3, 4 }, RepeatWeeks = 1 }));
+            await _gameService.CreatePlayerBoards(player.Id, new CreatePlayerBoardsRequestDto { SelectedNumbers = new() { 1, 2, 3, 4 }, RepeatWeeks = 1 }));
 
         // Valid
-        var created = await svc.CreatePlayerBoards(player.Id, new CreatePlayerBoardsRequestDto
+        var created = await _gameService.CreatePlayerBoards(player.Id, new CreatePlayerBoardsRequestDto
         {
             SelectedNumbers = new() { 1, 2, 3, 4, 5 },
             RepeatWeeks = 2
         });
         Assert.Equal(2, created.Count);
-        var numbersForFirst = await ctx.Playerboardnumbers.Where(n => n.Playerboardid == created[0].Id).Select(n => n.Selectednumber).OrderBy(n => n).ToListAsync();
+        var numbersForFirst = await _context.Playerboardnumbers.Where(n => n.Playerboardid == created[0].Id).Select(n => n.Selectednumber).OrderBy(n => n).ToListAsync();
         Assert.True(numbersForFirst.SequenceEqual(new[] { 1, 2, 3, 4, 5 }));
     }
 
     [Fact]
     public async Task FundRequests_Create_List_Approve_Deny()
     {
-        await using var ctx = CreateDbContext();
-        var ftp = new FakeTimeProvider(DateTimeOffset.UtcNow);
-        var svc = CreateGameService(ctx, ftp);
-
         var player = new Player
         {
             Id = Guid.NewGuid().ToString(),
-            Email = "p@example.com",
+            Email = $"p{Guid.NewGuid()}@example.com",
             Name = "P",
             Phonenumber = "11111",
             Passwordhash = "x",
-            Createdat = ftp.GetUtcNow().UtcDateTime,
+            Createdat = _fakeTimeProvider.GetUtcNow().UtcDateTime,
             Funds = 0m,
             Isdeleted = false
         };
         var admin = new Admin
         {
             Id = Guid.NewGuid().ToString(),
-            Email = "a@example.com",
+            Email = $"a{Guid.NewGuid()}@example.com",
             Name = "A",
             Phonenumber = "22222",
             Passwordhash = "y",
-            Createdat = ftp.GetUtcNow().UtcDateTime,
+            Createdat = _fakeTimeProvider.GetUtcNow().UtcDateTime,
             Isdeleted = false
         };
-        ctx.Players.Add(player);
-        ctx.Admins.Add(admin);
-        await ctx.SaveChangesAsync();
+        _context.Players.Add(player);
+        _context.Admins.Add(admin);
+        await _context.SaveChangesAsync();
 
-        var r1 = await svc.CreateFundRequest(player.Id, 100m, "tx-1");
-        ftp.Advance(TimeSpan.FromMinutes(1));
-        var r2 = await svc.CreateFundRequest(player.Id, 50m, "tx-2");
+        var r1 = await _gameService.CreateFundRequest(player.Id, 100m, "tx-1");
+        _fakeTimeProvider.Advance(TimeSpan.FromMinutes(1));
+        var r2 = await _gameService.CreateFundRequest(player.Id, 50m, "tx-2");
 
-        var listed = await svc.GetFundRequests();
+        var listed = await _gameService.GetFundRequests();
         Assert.Equal(new[] { r1.Id, r2.Id }, listed.Select(r => r.Id).ToArray());
 
-        var approved = await svc.ApproveFundRequest(r1.Id, admin.Id);
+        var approved = await _gameService.ApproveFundRequest(r1.Id, admin.Id);
         Assert.Equal("approved", approved.Status);
-        var reloadedPlayer = await ctx.Players.FirstAsync(p => p.Id == player.Id);
+        var reloadedPlayer = await _context.Players.FirstAsync(p => p.Id == player.Id);
         Assert.Equal(100m, reloadedPlayer.Funds);
 
-        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(async () => await svc.ApproveFundRequest(r1.Id, admin.Id));
+        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(async () => await _gameService.ApproveFundRequest(r1.Id, admin.Id));
 
-        var denied = await svc.DenyFundRequest(r2.Id, admin.Id);
+        var denied = await _gameService.DenyFundRequest(r2.Id, admin.Id);
         Assert.Equal("denied", denied.Status);
+    }
+
+    [Fact]
+    public async Task Player_Management_Get_Update_Delete_Restore()
+    {
+        var p = await _gameService.CreatePlayer(new CreatePlayerRequestDto
+        {
+            Name = "Original",
+            Email = $"m{Guid.NewGuid()}@example.com",
+            PhoneNumber = "12345678",
+            Password = "Password123!"
+        });
+
+        // GetById
+        var fetched = await _gameService.GetPlayerById(p.Id);
+        Assert.Equal("Original", fetched!.Name);
+
+        // Update
+        await _gameService.UpdatePlayer(p.Id, new UpdatePlayerRequestDto
+        {
+            Name = "Updated",
+            Email = p.Email,
+            Phonenumber = "222"
+        });
+        var updated = await _gameService.GetPlayerById(p.Id);
+        Assert.Equal("Updated", updated!.Name);
+        Assert.Equal("222", updated.Phonenumber);
+
+        // GetPlayers
+        var all = await _gameService.GetPlayers();
+        Assert.Contains(all, x => x.Id == p.Id);
+
+        // SoftDelete
+        await _gameService.SoftDeletePlayer(p.Id);
+        var deleted = await _gameService.GetPlayerById(p.Id);
+        Assert.Null(deleted); // GetPlayerById filters out deleted
+
+        var allAfterDelete = await _gameService.GetPlayers();
+        Assert.DoesNotContain(allAfterDelete, x => x.Id == p.Id);
+
+        // Restore
+        await _gameService.RestorePlayer(p.Id);
+        var restored = await _gameService.GetPlayerById(p.Id);
+        Assert.NotNull(restored);
+    }
+
+    [Fact]
+    public async Task ChangePassword_Succeeds_And_FailsOnWrongCurrent()
+    {
+        var pass = "OldPass123!";
+        var p = await _gameService.CreatePlayer(new CreatePlayerRequestDto
+        {
+            Name = "PassTest",
+            Email = $"p{Guid.NewGuid()}@example.com",
+            PhoneNumber = "12345678",
+            Password = pass
+        });
+
+        await _gameService.ChangePassword(p.Id, pass, "NewPass123!");
+        
+        // Try login with new pass to verify (I'll just check if it doesn't throw if I were using AuthService, 
+        // but here I check that old one fails if I try to change again or if I check hash)
+        // Actually I can just try to change it again using the NEW password as current.
+        await _gameService.ChangePassword(p.Id, "NewPass123!", "NewestPass123!");
+
+        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(async () =>
+            await _gameService.ChangePassword(p.Id, "WrongPass", "EvenNewer"));
+    }
+
+    [Fact]
+    public async Task Admin_Management_Delete_Restore()
+    {
+        var admin = new Admin
+        {
+            Id = Guid.NewGuid().ToString(),
+            Email = $"adm{Guid.NewGuid()}@example.com",
+            Name = "Admin",
+            Phonenumber = "000",
+            Passwordhash = "hash",
+            Createdat = DateTime.UtcNow,
+            Isdeleted = false
+        };
+        _context.Admins.Add(admin);
+        await _context.SaveChangesAsync();
+
+        await _gameService.SoftDeleteAdmin(admin.Id);
+        var dbAdmin = await _context.Admins.FirstAsync(a => a.Id == admin.Id);
+        Assert.True(dbAdmin.Isdeleted);
+
+        await _gameService.RestoreAdmin(admin.Id);
+        dbAdmin = await _context.Admins.FirstAsync(a => a.Id == admin.Id);
+        Assert.False(dbAdmin.Isdeleted);
+    }
+
+    [Fact]
+    public async Task Board_Management_Activate_Deactivate_GetActive_GetRecent()
+    {
+        var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
+        var b1 = new Board { Id = Guid.NewGuid().ToString(), Year = 2025, Weeknumber = 1, Isactive = false, Createdat = now, Startdate = now, Enddate = now.AddDays(6) };
+        var b2 = new Board { Id = Guid.NewGuid().ToString(), Year = 2025, Weeknumber = 2, Isactive = false, Createdat = now, Startdate = now.AddDays(7), Enddate = now.AddDays(13) };
+        _context.Boards.AddRange(b1, b2);
+        await _context.SaveChangesAsync();
+
+        await _gameService.ActivateBoard(b1.Id);
+        var active = await _gameService.GetActiveBoard();
+        Assert.Equal(b1.Id, active!.Id);
+
+        await _gameService.DeactivateBoard(b1.Id);
+        active = await _gameService.GetActiveBoard();
+        Assert.Null(active);
+
+        var recent = await _gameService.GetRecentBoards(10);
+        Assert.Contains(recent, b => b.Id == b1.Id);
+        Assert.Contains(recent, b => b.Id == b2.Id);
+    }
+
+    [Fact]
+    public async Task DrawWinningNumbersAndAdvance_Logic_Test()
+    {
+        // Setup admin
+        var admin = new Admin { Id = Guid.NewGuid().ToString(), Email = "a@a.dk", Name = "A", Passwordhash = "x", Phonenumber = "1" };
+        _context.Admins.Add(admin);
+
+        // Setup Player with enough funds
+        var p1 = await _gameService.CreatePlayer(new CreatePlayerRequestDto { Name = "P1", Email = "p1@a.dk", PhoneNumber = "12345678", Password = "Password123!" });
+        p1.Funds = 100m;
+        
+        // Setup Player with enough funds
+        var p2 = await _gameService.CreatePlayer(new CreatePlayerRequestDto { Name = "P2", Email = "p2@a.dk", PhoneNumber = "87654321", Password = "Password123!" });
+        p2.Funds = 100m;
+        await _context.SaveChangesAsync();
+
+        // Setup Board
+        var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
+        var b1 = new Board { Id = Guid.NewGuid().ToString(), Year = 2025, Weeknumber = 1, Isactive = true, Createdat = now, Startdate = now, Enddate = now.AddDays(6) };
+        var b2 = new Board { Id = Guid.NewGuid().ToString(), Year = 2025, Weeknumber = 2, Isactive = false, Createdat = now.AddDays(7), Startdate = now.AddDays(7), Enddate = now.AddDays(13) };
+        _context.Boards.AddRange(b1, b2);
+        await _context.SaveChangesAsync();
+
+        // Create PlayerBoards for both
+        await _gameService.CreatePlayerBoards(p1.Id, new CreatePlayerBoardsRequestDto { SelectedNumbers = new() { 1, 2, 3, 4, 5 }, RepeatWeeks = 1 });
+        await _gameService.CreatePlayerBoards(p2.Id, new CreatePlayerBoardsRequestDto { SelectedNumbers = new() { 1, 2, 3, 4, 5 }, RepeatWeeks = 1 });
+
+        // Get active participants
+        var participants = await _gameService.GetActiveParticipants();
+        // Both have boards for current active board
+        Assert.Equal(2, participants.Count);
+
+        // Draw numbers (exactly 3 required)
+        await _gameService.DrawWinningNumbersAndAdvance(admin.Id, new[] { 1, 2, 3 });
+
+        // Reload board
+        var oldBoard = await _context.Boards.Include(b => b.Drawnnumbers).FirstAsync(b => b.Id == b1.Id);
+        Assert.False(oldBoard.Isactive);
+        Assert.Equal(3, oldBoard.Drawnnumbers.Count);
+        Assert.NotNull(oldBoard.Enddate);
+
+        // Verify next board is active and has start date
+        var nextBoard = await _context.Boards.FirstAsync(b => b.Id == b2.Id);
+        Assert.True(nextBoard.Isactive);
+        Assert.NotNull(nextBoard.Startdate);
+
+        // Check winners in history (since it's calculated there)
+        var history = await _gameService.GetGameHistory();
+        Assert.NotEmpty(history);
+        var historyEntry = history.First(h => h.BoardId == b1.Id);
+        Assert.Equal(2, historyEntry.Winners);
+    }
+
+    [Fact]
+    public async Task DrawWinningNumbersAndAdvance_YearTransition_Test()
+    {
+        var admin = new Admin { Id = Guid.NewGuid().ToString(), Email = "a@a.dk", Name = "A", Passwordhash = "x", Phonenumber = "1" };
+        _context.Admins.Add(admin);
+
+        var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
+        var b1 = new Board { Id = "2025-52", Year = 2025, Weeknumber = 52, Isactive = true, Createdat = now };
+        var b2 = new Board { Id = "2026-01", Year = 2026, Weeknumber = 1, Isactive = false, Createdat = now };
+        _context.Boards.AddRange(b1, b2);
+        await _context.SaveChangesAsync();
+
+        await _gameService.DrawWinningNumbersAndAdvance(admin.Id, new[] { 1, 2, 3 });
+
+        var board52 = await _context.Boards.FirstAsync(b => b.Id == "2025-52");
+        Assert.False(board52.Isactive);
+
+        var board01 = await _context.Boards.FirstAsync(b => b.Id == "2026-01");
+        Assert.True(board01.Isactive);
+    }
+
+    [Fact]
+    public async Task Unhappy_Paths_Tests()
+    {
+        // Player not found
+        var fetched = await _gameService.GetPlayerById("nonexistent");
+        Assert.Null(fetched);
+
+        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(async () =>
+            await _gameService.UpdatePlayer("nonexistent", new UpdatePlayerRequestDto { Name = "X" }));
+
+        // Admin not found
+        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(async () =>
+            await _gameService.DrawWinningNumbersAndAdvance("nonexistent", new[] { 1, 2, 3 }));
+
+        // No active board
+        var admin = new Admin { Id = Guid.NewGuid().ToString(), Email = "a@a.dk", Name = "A", Passwordhash = "x", Phonenumber = "123456" };
+        _context.Admins.Add(admin);
+        await _context.SaveChangesAsync();
+        
+        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(async () =>
+            await _gameService.DrawWinningNumbersAndAdvance(admin.Id, new[] { 1, 2, 3 }));
     }
 }

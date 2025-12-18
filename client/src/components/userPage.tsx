@@ -1,9 +1,10 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import NumberBoard from './UI/NumberBoard';
 import { Button } from './UI/Button';
 import { Card, CardContent, CardHeader, CardTitle } from './UI/Card';
 import { Checkbox } from './UI/Checkbox';
 import { AlertCircle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
+import { Badge } from './UI/Badge';
 import {
     Dialog,
     DialogContent,
@@ -13,11 +14,19 @@ import {
     DialogFooter,
 } from './UI/Dialog';
 import { Input } from './UI/Input';
+import type {JwtClaims} from '@core/generated-client.ts';
+import { playersApi } from '@utilities/playersApi.ts';
+import { boardsApi } from '@utilities/boardsApi.ts';
+import toast from 'react-hot-toast';
 
 interface Board {
     id: number;
     selectedNumbers: number[];
     repeatWeeks: number;
+}
+
+interface UserViewProps {
+    claims: JwtClaims;
 }
 
 const PRICES = {
@@ -27,13 +36,32 @@ const PRICES = {
     8: 160,
 };
 
-export default function UserView() {
+export default function UserView({ claims }: UserViewProps) {
     const [boards, setBoards] = useState<Board[]>([
         { id: 1, selectedNumbers: [], repeatWeeks: 1 },
     ]);
     const [submitted, setSubmitted] = useState(false);
     const [showRepeatDialog, setShowRepeatDialog] = useState<number | null>(null);
     const [repeatWeeks, setRepeatWeeks] = useState('1');
+    const [activeBoardLabel, setActiveBoardLabel] = useState<string>("Indlæser...");
+    const [loading, setLoading] = useState(false);
+    const [history, setHistory] = useState<any[]>([]);
+
+    useEffect(() => {
+        boardsApi.getActive().then(active => {
+            if (active && active.week) {
+                setActiveBoardLabel(`Nuværende spil: Uge ${active.week} ${active.year}`);
+            } else {
+                setActiveBoardLabel("Intet aktivt spil");
+            }
+        }).catch(() => {
+            setActiveBoardLabel("Intet aktivt spil");
+        });
+
+        boardsApi.getHistory(10).then(h => {
+            setHistory(h);
+        }).catch(() => {});
+    }, []);
 
     const handleNumberSelect = (boardId: number, num: number) => {
         setBoards(
@@ -105,15 +133,30 @@ export default function UserView() {
         return 0;
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         const allValid = boards.every(
             (b) =>
                 b.selectedNumbers.length >= 5 &&
                 b.selectedNumbers.length <= 8,
         );
-        if (allValid) {
+        if (!allValid) return;
+
+        setLoading(true);
+        try {
+            for (const board of boards) {
+                await playersApi.createBoards(claims.id, {
+                    selectedNumbers: board.selectedNumbers,
+                    repeatWeeks: board.repeatWeeks
+                });
+            }
             setSubmitted(true);
+            toast.success("Brætter tilmeldt!");
+            setBoards([{ id: 1, selectedNumbers: [], repeatWeeks: 1 }]);
             setTimeout(() => setSubmitted(false), 3000);
+        } catch (e: any) {
+            toast.error(e?.message ?? "Kunne ikke tilmelde brætter. Tjek din saldo.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -134,7 +177,7 @@ export default function UserView() {
             <Card className="border-2 border-[#ed1c24]/20">
                 <CardHeader className="bg-gradient-to-r from-[#ed1c24]/5 to-transparent">
                     <CardTitle className="text-[#ed1c24]">
-                        Nuværende spil: Uge 46 2024
+                        {activeBoardLabel}
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
@@ -336,56 +379,44 @@ export default function UserView() {
                 </CardHeader>
                 <CardContent>
                     <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3">
-                        {[
-                            {
-                                week: 'Uge 45 2024',
-                                numbers: [3, 7, 12],
-                                winner: false,
-                            },
-                            {
-                                week: 'Uge 44 2024',
-                                numbers: [1, 8, 15],
-                                winner: false,
-                            },
-                            {
-                                week: 'Uge 43 2024',
-                                numbers: [4, 9, 13],
-                                winner: true,
-                            },
-                        ].map((result, idx) => (
-                            <div
-                                key={idx}
-                                className={`flex items-center justify-between p-3 rounded-lg border ${
-                                    result.winner
-                                        ? 'bg-green-50 border-green-200'
-                                        : 'bg-gray-50 border-gray-200'
-                                }`}
-                            >
-                                <span className="text-sm">
-                                    {result.week}
-                                </span>
-                                <div className="flex items-center space-x-2">
+                        {history.length === 0 ? (
+                            <p className="text-center text-gray-500 py-4">Ingen historik fundet</p>
+                        ) : (
+                            history.map((result, idx) => (
+                                <div
+                                    key={idx}
+                                    className={`flex items-center justify-between p-3 rounded-lg border ${
+                                        result.winners > 0
+                                            ? 'bg-green-50 border-green-200'
+                                            : 'bg-gray-50 border-gray-200'
+                                    }`}
+                                >
                                     <span className="text-sm">
-                                        Vindertal:
+                                        Uge {result.week} {result.year}
                                     </span>
-                                    <div className="flex space-x-1">
-                                        {result.numbers.map((num) => (
-                                            <div
-                                                key={num}
-                                                className="w-8 h-8 rounded-md bg-[#ed1c24] text-white flex items-center justify-center text-xs"
-                                            >
-                                                {num}
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {result.winner && (
-                                        <span className="ml-2 text-xs bg-green-600 text-white px-2 py-1 rounded">
-                                            Vinder!
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-sm">
+                                            Vindertal:
                                         </span>
-                                    )}
+                                        <div className="flex space-x-1">
+                                            {result.numbers.map((num: number) => (
+                                                <div
+                                                    key={num}
+                                                    className="w-8 h-8 rounded-md bg-[#ed1c24] text-white flex items-center justify-center text-xs"
+                                                >
+                                                    {num}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {result.winners > 0 && (
+                                            <Badge className="bg-green-600 text-white ml-2">
+                                                Vindere fundet!
+                                            </Badge>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                 </CardContent>
             </Card>

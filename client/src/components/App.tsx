@@ -150,7 +150,7 @@ export default function App() {
                         path="/user"
                         element={
                             <RequireAuth isAuthed={!!claims}>
-                                <UserView />
+                                <UserView claims={claims!} />
                             </RequireAuth>
                         }
                     />

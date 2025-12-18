@@ -11,9 +11,9 @@ public partial class Board
 
     public int Year { get; set; }
 
-    public DateTime Startdate { get; set; }
+    public DateTime? Startdate { get; set; }
 
-    public DateTime Enddate { get; set; }
+    public DateTime? Enddate { get; set; }
 
     public bool Isactive { get; set; }
 

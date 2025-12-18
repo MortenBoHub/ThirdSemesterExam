@@ -1047,7 +1047,7 @@ function FundsEditDialog({
 
     return (
         <Dialog open={true} onOpenChange={onClose}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md bg-white">
                 <DialogHeader>
                     <DialogTitle>Rediger Saldo - {user.name}</DialogTitle>
                     <DialogDescription>

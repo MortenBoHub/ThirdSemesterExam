@@ -65,34 +65,60 @@ public class GameService(MyDbContext ctx, TimeProvider timeProvider, IPasswordHa
         if (boards.Count < dto.RepeatWeeks)
             throw new ValidationException("Not enough future boards are available to cover repeat weeks");
 
-        var created = new List<Playerboard>();
-        foreach (var board in boards)
+        // Calculate total cost
+        decimal pricePerBoard = numbers.Count switch
         {
-            var pb = new Playerboard
-            {
-                Id = Guid.NewGuid().ToString(),
-                Playerid = player.Id,
-                Boardid = board.Id,
-                Createdat = now,
-                Iswinner = false
-            };
-            ctx.Playerboards.Add(pb);
+            5 => 20m,
+            6 => 40m,
+            7 => 80m,
+            8 => 160m,
+            _ => 0m
+        };
+        decimal totalCost = pricePerBoard * boards.Count;
 
-            foreach (var n in numbers)
+        if (player.Funds < totalCost)
+            throw new ValidationException($"Insufficient funds. Required: {totalCost} kr, Current: {player.Funds} kr");
+
+        using var tx = await ctx.Database.BeginTransactionAsync();
+        try
+        {
+            player.Funds -= totalCost;
+
+            var created = new List<Playerboard>();
+            foreach (var board in boards)
             {
-                ctx.Playerboardnumbers.Add(new Playerboardnumber
+                var pb = new Playerboard
                 {
                     Id = Guid.NewGuid().ToString(),
-                    Playerboardid = pb.Id,
-                    Selectednumber = n
-                });
+                    Playerid = player.Id,
+                    Boardid = board.Id,
+                    Createdat = now,
+                    Iswinner = false
+                };
+                ctx.Playerboards.Add(pb);
+
+                foreach (var n in numbers)
+                {
+                    ctx.Playerboardnumbers.Add(new Playerboardnumber
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Playerboardid = pb.Id,
+                        Selectednumber = n
+                    });
+                }
+
+                created.Add(pb);
             }
 
-            created.Add(pb);
+            await ctx.SaveChangesAsync();
+            await tx.CommitAsync();
+            return created;
         }
-
-        await ctx.SaveChangesAsync();
-        return created;
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<List<Player>> GetPlayers()
@@ -331,6 +357,7 @@ public class GameService(MyDbContext ctx, TimeProvider timeProvider, IPasswordHa
             }
 
             active.Isactive = false;
+            active.Enddate = now;
 
             // Find next board by iso week/year ordering
             var next = await ctx.Boards
@@ -341,6 +368,7 @@ public class GameService(MyDbContext ctx, TimeProvider timeProvider, IPasswordHa
             if (next != null)
             {
                 next.Isactive = true;
+                next.Startdate = now;
             }
 
             await ctx.SaveChangesAsync();

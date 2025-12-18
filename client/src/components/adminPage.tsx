@@ -250,11 +250,19 @@ export default function AdminPage() {
                                 </Button>
                             </div>
 
-                            {/* Reset Button */}
+                            {/* Confirm Draw Button */}
                             {drawnNumbers.length === 3 && (
                                 <div className="text-center">
                                     <Button
-                                        onClick={clearDrawnNumbers}
+                                        onClick={async () => {
+                                            try {
+                                                await boardsApi.draw(drawnNumbers);
+                                                toast.success("Vindernumre udtrukket! Spillet er nu avanceret til næste uge.");
+                                                setTimeout(() => window.location.reload(), 1500);
+                                            } catch (e: any) {
+                                                toast.error(e?.message ?? "Kunne ikke bekræfte numre");
+                                            }
+                                        }}
                                         className="border border-[#ed1c24]/40
                                         text-[#ed1c24]
                                         bg-white
