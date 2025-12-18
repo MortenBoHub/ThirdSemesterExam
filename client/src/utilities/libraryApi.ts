@@ -1,13 +1,9 @@
-import {LibraryClient, type Book} from "@core/generated-client.ts";
-import {baseUrl} from "@core/baseUrl.ts";
-import {customFetch} from "@utilities/customFetch.ts";
-import {resolveRefs} from "dotnet-json-refs";
+// Temporary stub: the current OpenAPI spec does not generate LibraryClient/Book.
+// Provide a minimal API so the UI can build and deploy. Replace with real client when backend adds endpoints.
+export type Book = { id: string; title: string }
 
-class LibraryClientWithResolvedRefs extends LibraryClient {
-    override async getBooks(requestDto: any): Promise<Book[]> {
-        const result = await super.getBooks(requestDto);
-        return resolveRefs(result);
+export const libraryApi = {
+    async getBooks(_requestDto: unknown): Promise<Book[]> {
+        return []
     }
 }
-
-export const libraryApi = new LibraryClientWithResolvedRefs(baseUrl, customFetch);

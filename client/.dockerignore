@@ -1,0 +1,44 @@
+# flyctl launch added from .gitignore
+# Logs
+**\logs
+**\*.log
+**\npm-debug.log*
+**\yarn-debug.log*
+**\yarn-error.log*
+**\pnpm-debug.log*
+**\lerna-debug.log*
+
+**\node_modules
+**\dist
+**\dist-ssr
+**\*.local
+
+# Editor directories and files
+**\.vscode\*
+!**\.vscode\extensions.json
+**\.idea
+**\.DS_Store
+**\.claude
+**\*.suo
+**\*.ntvs*
+**\*.njsproj
+**\*.sln
+**\*.sw?
+
+# flyctl launch added from .idea\.gitignore
+.idea\**\﻿# Default ignored files
+.idea\shelf
+.idea\workspace.xml
+# Rider ignored files
+.idea\projectSettingsUpdater.xml
+.idea\.idea.client.iml
+.idea\contentModel.xml
+.idea\modules.xml
+# Ignored default folder with query files
+.idea\queries
+# Datasource local storage ignored files
+.idea\dataSources
+.idea\dataSources.local.xml
+# Editor-based HTTP Client requests
+.idea\httpRequests
+fly.toml

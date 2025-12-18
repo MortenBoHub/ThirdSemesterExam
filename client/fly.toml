@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for projectsolutionclient on 2025-09-15T10:47:32+02:00
+# fly.toml app configuration file generated for doededuer-jerneif on 2025-12-18T14:16:34+01:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -7,18 +7,18 @@ app = 'doededuer-jerneif'
 primary_region = 'fra'
 
 [build]
-dockerfile = './Dockerfile'
+  dockerfile = './Dockerfile'
+
   [build.args]
-    # API base URL for the client to connect to
     VITE_API_BASE_URL = 'https://jerneif-doededuer.fly.dev'
 
 [http_service]
-internal_port = 8080
-force_https = true
-auto_stop_machines = 'stop'
-auto_start_machines = true
-min_machines_running = 0
-processes = ['app']
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
 
 [[vm]]
-size = 'shared-cpu-1x'
+  size = 'shared-cpu-1x'
