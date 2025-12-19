@@ -105,3 +105,9 @@ DO $$
               AND b.year = to_char(gs, 'IYYY')::int
         );
     END$$;
+
+-- Creating an Admin:
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+INSERT INTO "dødeduer".admin (id, name, email, phonenumber, passwordhash, createdat, isdeleted)
+VALUES (gen_random_uuid(), 'Lorem Ipsum', 'email@email.dk', '87654321', encode(digest('12345678','sha512'),'hex'), now(), false);

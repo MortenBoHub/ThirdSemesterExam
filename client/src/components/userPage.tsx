@@ -291,7 +291,7 @@ export default function UserView({ claims }: UserViewProps) {
                                         />
 
                                         {/* Repeat Option */}
-                                        <div className="flex items-center space-x-2 bg-gray-50 rounded-lg p-4">
+                                        <div className="flex items-center space-x-2 bg-gray-50 rounded-lg p-4 bg-white">
                                             <Checkbox
                                                 id={`repeat-${board.id}`}
                                                 checked={
