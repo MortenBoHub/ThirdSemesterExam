@@ -90,6 +90,8 @@ public class PlayersController(IGameService gameService, ISieveProcessor sieve, 
     [Authorize]
     public async Task<ActionResult<object>> UpdatePlayer([FromRoute] string id, [FromBody] UpdatePlayerRequestDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
         var jwt = await authService.VerifyAndDecodeToken(Request.Headers.Authorization.FirstOrDefault());
         var isAdmin = string.Equals(jwt.Role, "Admin", StringComparison.OrdinalIgnoreCase);
         if (!isAdmin && !string.Equals(jwt.Id, id, StringComparison.Ordinal))
