@@ -174,7 +174,7 @@ export default function AdminPage() {
             </Card>
 
             <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-md bg-white">
                     <DialogHeader>
                         <DialogTitle className="text-green-600 flex items-center gap-2">
                             <span>✅ Succes!</span>
