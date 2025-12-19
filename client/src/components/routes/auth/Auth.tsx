@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import {libraryApi, type Book} from "@utilities/libraryApi.ts";
 import {SieveQueryBuilder} from "ts-sieve-query-builder";
 
+/* Unused depracated class */
 export default function Auth() {
     
     const [registerForm, setRegisterForm] = useState<RegisterRequestDto>({

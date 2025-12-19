@@ -140,7 +140,7 @@ export default function ProfileModal({
                                 u.fundsRequests = byPlayer[u.backendId];
                             }
                         });
-                        // Sort users by oldest pending request date (ascending). Users without pending requests come after.
+                        // Sort users by oldest pending request date (ascending).
                         mappedUsers.sort((a, b) => {
                             const aPending = a.fundsRequests.filter(r => r.status === 'pending');
                             const bPending = b.fundsRequests.filter(r => r.status === 'pending');
@@ -148,7 +148,7 @@ export default function ProfileModal({
                             const bDate = bPending.length > 0 ? new Date(bPending[0].date).getTime() : Number.POSITIVE_INFINITY;
                             return aDate - bDate; // oldest first
                         });
-                    } catch { /* ignore pending load errors here */ }
+                    } catch {  }
 
                     setUsers(mappedUsers);
                 }
@@ -603,7 +603,7 @@ export default function ProfileModal({
                                         await playersApi.changePassword(currentUser.id, vals.currentPassword, vals.newPassword);
                                     }
 
-                                    // Refresh me
+                                    // Refresh
                                     try {
                                         const player = await playersApi.getPlayer(currentUser.id);
                                         setCurrentUser((prev) => ({

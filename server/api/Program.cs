@@ -43,7 +43,7 @@ public class Program
             // After DTO shaping, avoid $id/$ref artifacts
             opts.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             opts.JsonSerializerOptions.MaxDepth = 128;
-            // Stage 3: standardize casing to camelCase
+            // standardize casing to camelCase
             opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         });
         services.AddOpenApiDocument();
@@ -71,7 +71,6 @@ public class Program
                     }
                     else
                     {
-                        // Block all cross-origin requests by default in Production if not explicitly configured.
                         policy.SetIsOriginAllowed(_ => false);
                     }
                 }
@@ -79,7 +78,7 @@ public class Program
         });
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IGameService, GameService>();
-        // Password hashing for players (Stage 3)
+        // Password hashing for players
         services.AddScoped<IPasswordHasher<Player>, BcryptPasswordHasher>();
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
@@ -96,7 +95,7 @@ public class Program
             });
         });
 
-        // Authentication & Authorization (Stage 1)
+        // Authentication & Authorization
         // Use a single source of truth for JwtSecret from configuration
         var jwtSecret = configuration["AppOptions:JwtSecret"] ?? "thisisjustadefaultsecretfortestingpurposes";
         var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
@@ -166,7 +165,7 @@ public class Program
         
         app.UseExceptionHandler(config => { });
         
-        // Safety guard: warn if mock logins are enabled in Production
+        // Safety guard, warn if mock logins are enabled in Production
         var appOptions = app.Services.GetRequiredService<AppOptions>();
         var logger = app.Services.GetRequiredService<ILogger<Program>>();
         // Log non-reversible fingerprints of JwtSecret for signer/validator parity checks
@@ -179,7 +178,7 @@ public class Program
         }
         catch
         {
-            // no-op
+            
         }
         if (app.Environment.IsProduction() &&
             (appOptions.EnableMockLogin || appOptions.EnableMockLoginAdmin || appOptions.EnableMockLoginUser))
@@ -192,7 +191,7 @@ public class Program
         app.UseSwaggerUi();
         app.MapScalarApiReference(options => options.OpenApiRoutePattern = "/swagger/v1/swagger.json"
         );
-        // Stage 1: Enable authentication/authorization middleware
+        // Enable authentication/authorization middleware
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseRateLimiter();

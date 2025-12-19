@@ -17,12 +17,12 @@ public class PlayersController(IGameService gameService, ISieveProcessor sieve, 
     [AllowAnonymous]
     public async Task<ActionResult<List<object>>> GetPlayers([FromQuery] SieveModel? sieveModel)
     {
-        // Support filtering/sorting/paging via Sieve while keeping default behaviour
+        // Support filtering/sorting/paging via Sieve
         var query = ctx.Players.AsNoTracking().Where(p => !p.Isdeleted);
         if (sieveModel != null)
         {
             query = sieve.Apply(sieveModel, query);
-            // Paging is also applied by Sieve; fall through to ToListAsync
+            // Paging is also applied by Sieve
         }
         else
         {

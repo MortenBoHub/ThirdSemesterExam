@@ -19,7 +19,7 @@ public interface IGameService
     Task<Board?> GetActiveBoard();
     Task<List<Board>> GetRecentBoards(int take = 10);
     Task<List<api.Models.Responses.ActiveParticipantDto>> GetActiveParticipants();
-    Task<List<api.Models.Responses.GameHistoryDto>> GetGameHistory(int take = 10);
+    Task<List<api.Models.Responses.GameHistoryDto>> GetGameHistory(int take = 10, string? playerId = null, bool isAdmin = false);
 
     // Boards / Draw
     Task DrawWinningNumbersAndAdvance(string adminId, IReadOnlyCollection<int> numbers);

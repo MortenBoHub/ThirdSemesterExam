@@ -32,6 +32,7 @@
 - Password hashing with HMACSHA512 and unique salt for the admin.
 - Password hashing with Bcrypt and unique salt for all other users.
 - Mock login should be enabled by default in development?
+- Abides by security protocols in regards to SQL Injections.
 
 ### Authorization model
 #### Roles (& permissions)
@@ -119,14 +120,16 @@
 - **State Management**: Reactive UI using Jotai and Tailwind.
 
 ## Known Bugs (& Limitations)
-- **CRUD Operations**: There have been issues with CRUD operations sometimes not working. Creating Players was working for quite a while before deciding not to work randomly, but is back to working we hope. Reading Players from the database also sometimes decides to stop working for the list in admin's user page, might require a reload. Updating your own profile also seems to encounter errors.
-- **Logging**: The program has honestly very limited logging capabilities.
-- **Mock Login**: There's been trouble with the mock login on development environments. If you wish to try, it's admin/admin and user/user for the logins and passwords.
+- **CRUD Operations**: There have been issues with CRUD operations sometimes not working. Creating Players was working for quite a while before deciding not to work randomly, but is back to working we hope. Reading Players from the database also sometimes decides to stop working for the list in admin's user page, might require a reload. Updating your own profile also seems to encounter errors from time to time, but mostly works. **Note** Updating Admin profile does not work at the moment.
+- **Logging**: The program has honestly pretty limited logging capabilities.
+- **Mock Login**: There's been trouble with the mock login on development environments. If you wish to try, it's admin/admin and user/user for the logins and passwords. Does not work on production.
+- **Admins**: Admins currently do not have funds, and so cannot buy boards. Listed here, but probably a good thing.
+- **Board Activation**: Board activation works, but currently there's nothing "locking" a board at any specific time, it just remains active until the admin draws the numbers and activates the next board.
 - **Soft Delete**: Players are soft-deleted, so if you want to permanently delete someone, it requires manual DB action. Restoring soft-deleted players is also possible but only so long as you dont close down the Bruger dialogue box.
+- **"Brugere"**: The admin can only see the "Brugere" button when on the "Administrer Spillere" page. Unintended, but not a big issue.
 
 ## Test Logins (& Links)
 ### Environments
-- **Local**: [http://localhost:5173](http://localhost:5173) (Vite default)
 - **Website**: https://doededuer-jerneif.fly.dev/
 - **API Documentation**: https://jerneif-doededuer.fly.dev/swagger/
 

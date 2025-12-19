@@ -1,1 +1,1 @@
-﻿// Deprecated duplicate of api.Models.AppOptions. Left intentionally empty to avoid type conflicts.
+﻿// Deprecated duplicate of api.Models.AppOptions

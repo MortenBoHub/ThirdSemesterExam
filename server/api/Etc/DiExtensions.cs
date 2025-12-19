@@ -33,21 +33,21 @@ public static class DiExtensions
 
     public static async Task GenerateApiClientsFromOpenApi(this WebApplication app, string path)
     {
-        // Step 1: Generate OpenAPI document with full documentation
+        // Generate OpenAPI document with full documentation
         var document = await app.Services.GetRequiredService<IOpenApiDocumentGenerator>()
             .GenerateAsync("v1");
 
-        // Step 2: Serialize the document to JSON to verify it contains documentation
+        // Serialize the document to JSON to verify it contains documentation
         var openApiJson = document.ToJson();
 
-        // Optional: Save the OpenAPI JSON to verify it has documentation
+        // Optional, Save the OpenAPI JSON to verify it has documentation
         var openApiPath = Path.Combine(Directory.GetCurrentDirectory(), "openapi-with-docs.json");
         await File.WriteAllTextAsync(openApiPath, openApiJson);
 
-        // Step 3: Parse the document back from JSON to ensure we're only using what's in the OpenAPI spec
+        // Parse the document back from JSON to ensure we're only using what's in the OpenAPI spec
         var documentFromJson = await OpenApiDocument.FromJsonAsync(openApiJson);
 
-        // Step 4: Generate TypeScript client from the parsed OpenAPI document
+        //Generate TypeScript client from the parsed OpenAPI document
         var settings = new TypeScriptClientGeneratorSettings
         {
             Template = TypeScriptTemplate.Fetch,
@@ -66,11 +66,11 @@ public static class DiExtensions
             }
         };
 
-        // Step 5: Generate TypeScript client from the parsed OpenAPI document
+        //Generate TypeScript client from the parsed OpenAPI document
         var generator = new TypeScriptClientGenerator(documentFromJson, settings);
         var code = generator.GenerateFile();
 
-        // Step 6: Post-process to add const objects for constant schemas
+        // Post-process to add const objects for constant schemas
         code = AddConstantObjects(code, documentFromJson);
 
         var outputPath = Path.Combine(Directory.GetCurrentDirectory() + path);

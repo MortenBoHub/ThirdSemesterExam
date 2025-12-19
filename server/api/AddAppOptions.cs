@@ -1,1 +1,1 @@
-﻿// Deprecated duplicate helper. Using api.Etc.DiExtensions.InjectAppOptions instead.
+﻿// Deprecated duplicate helper.

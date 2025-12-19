@@ -23,11 +23,15 @@ import toast from "react-hot-toast";
 export default function AdminPage() {
     const [drawnNumbers, setDrawnNumbers] = useState<number[]>([]);
     const [participants, setParticipants] = useState<{name: string; email: string; numbers: number[]; matches: number;}[]>([]);
-    const [gameHistory, setGameHistory] = useState<{id: string; week: string; date: string; numbers: number[]; participants: number; winners: number;}[]>([]);
+    const [gameHistory, setGameHistory] = useState<{id: string; week: string; date: string; numbers: number[]; participants: number; winners: number; winnerDetails?: any[]}[]>([]);
     const [currentWeekLabel, setCurrentWeekLabel] = useState<string>("-");
     const [onlineCount, setOnlineCount] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(false);
     const [manualInput, setManualInput] = useState("");
+
+    // Winners dialog state
+    const [selectedGameWinners, setSelectedGameWinners] = useState<any[] | null>(null);
+    const [showWinnersDialog, setShowWinnersDialog] = useState(false);
 
     // Create Player form state
     const [playerName, setPlayerName] = useState("");
@@ -94,6 +98,7 @@ export default function AdminPage() {
                     numbers: h.numbers ?? [],
                     participants: h.participants ?? 0,
                     winners: h.winners ?? 0,
+                    winnerDetails: h.winnerDetails ?? [],
                 }));
                 setGameHistory(mappedHist);
             } catch (e:any) {
@@ -409,18 +414,28 @@ export default function AdminPage() {
                                     {gameHistory.map((game) => (
                                         <div
                                             key={game.id}
-                                            className="border rounded-lg p-4 hover:border-[#ed1c24]"
+                                            onClick={() => {
+                                                if (game.winners > 0) {
+                                                    setSelectedGameWinners(game.winnerDetails || []);
+                                                    setShowWinnersDialog(true);
+                                                }
+                                            }}
+                                            className={`border rounded-lg p-4 transition-all ${
+                                                game.winners > 0 
+                                                    ? "hover:border-[#ed1c24] cursor-pointer bg-green-50/30" 
+                                                    : "hover:border-gray-400"
+                                            }`}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <div className="space-y-1">
-                                                    <p>{game.week}</p>
+                                                    <p className="font-medium">{game.week}</p>
                                                     <p className="text-sm text-gray-600">{game.date}</p>
 
                                                     <div className="text-sm text-gray-600 flex space-x-4">
                                                         <span>{game.participants} deltagere</span>
 
                                                         {game.winners > 0 && (
-                                                            <span className="text-green-600">{game.winners} vindere</span>
+                                                            <span className="text-green-600 font-bold">{game.winners} vindere (Klik for detaljer)</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -444,6 +459,48 @@ export default function AdminPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* WINNERS DETAILS DIALOG */}
+            <Dialog open={showWinnersDialog} onOpenChange={setShowWinnersDialog}>
+                <DialogContent className="sm:max-w-lg bg-white">
+                    <DialogHeader>
+                        <DialogTitle className="text-[#ed1c24] flex items-center gap-2">
+                            <Trophy size={20} />
+                            <span>Vindere for ugen</span>
+                        </DialogTitle>
+                        <DialogDescription>
+                            Her er listen over spillere, der har udtrukket alle vindernummer.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                        {selectedGameWinners && selectedGameWinners.length > 0 ? (
+                            selectedGameWinners.map((winner, idx) => (
+                                <div key={idx} className="border p-4 rounded-lg space-y-2 bg-gray-50">
+                                    <div className="flex justify-between items-start">
+                                        <p className="font-bold text-lg">{winner.name}</p>
+                                        <Badge className="bg-green-600">Vinder</Badge>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-1 text-sm text-gray-700">
+                                        <p><strong>Email:</strong> {winner.email}</p>
+                                        <p><strong>Telefon:</strong> {winner.phonenumber}</p>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-center text-gray-500">Ingen vindere fundet.</p>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            className="bg-[#ed1c24] hover:bg-[#d11920] text-white px-8"
+                            onClick={() => setShowWinnersDialog(false)}
+                        >
+                            Luk
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

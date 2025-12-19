@@ -18,8 +18,10 @@ export const boardsApi = {
     return await res.json();
   },
 
-  async getHistory(take: number = 10) {
-    const res = await customFetch.fetch(`${baseUrl}/api/Boards/history?take=${take}`, {
+  async getHistory(take: number = 10, playerId?: string) {
+    let url = `${baseUrl}/api/Boards/history?take=${take}`;
+    if (playerId) url += `&playerId=${encodeURIComponent(playerId)}`;
+    const res = await customFetch.fetch(url, {
       method: "GET",
     });
     if (!res.ok) throw new Error("Failed to fetch game history");

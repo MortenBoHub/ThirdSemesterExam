@@ -8,7 +8,7 @@ import { authApi } from "@utilities/authApi.ts";
 import toast from "react-hot-toast";
 
 interface LoginScreenProps {
-    // made optional so you can use <LoginPage /> without passing it yet
+    // Optional to not pass yet
     onLogin: (username: string, isAdmin: boolean) => void;
 }
 

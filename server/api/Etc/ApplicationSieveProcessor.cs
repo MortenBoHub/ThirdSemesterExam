@@ -5,9 +5,7 @@ using dataccess;
 
 namespace api.Etc;
 
-/// <summary>
-///     Custom Sieve processor with fluent API configuration for entities
-/// </summary>
+//     Custom Sieve processor with fluent API configuration for entities
 public class ApplicationSieveProcessor : SieveProcessor
 {
     public ApplicationSieveProcessor(IOptions<SieveOptions> options) : base(options)

@@ -248,6 +248,7 @@ public class GameService(MyDbContext ctx, TimeProvider timeProvider, IPasswordHa
         take = Math.Clamp(take, 1, 100);
         return await ctx.Boards
             .Include(b => b.Drawnnumbers)
+            .Where(b => b.Drawnnumbers.Any())
             .OrderByDescending(b => b.Year).ThenByDescending(b => b.Weeknumber)
             .Take(take)
             .ToListAsync();
@@ -290,35 +291,82 @@ public class GameService(MyDbContext ctx, TimeProvider timeProvider, IPasswordHa
             .ToList();
     }
 
-    public async Task<List<GameHistoryDto>> GetGameHistory(int take = 10)
+    public async Task<List<GameHistoryDto>> GetGameHistory(int take = 10, string? playerId = null, bool isAdmin = false)
     {
         var boards = await GetRecentBoards(take);
         var result = new List<GameHistoryDto>();
         foreach (var b in boards)
         {
-            var numbers = b.Drawnnumbers.Select(d => d.Drawnnumber1).OrderBy(n => n).ToList();
-            var participantCount = await ctx.Playerboards.CountAsync(pb => pb.Boardid == b.Id);
+            var drawnNumbers = b.Drawnnumbers.Select(d => d.Drawnnumber1).OrderBy(n => n).ToList();
 
-            int winners = 0;
-            if (numbers.Count > 0)
+            // Load relevant player boards for this board
+            // Optimization: If we only need one player, we could filter here, 
+            // but we also need the total winner count and participants count.
+            var allPlayerBoards = await ctx.Playerboards
+                .Include(pb => pb.Player)
+                .Include(pb => pb.Playerboardnumbers)
+                .Where(pb => pb.Boardid == b.Id)
+                .ToListAsync();
+
+            // Calculate winners - trust isWinner if any are set, otherwise calculate for backward compatibility
+            int winnersCount = allPlayerBoards.Count(pb => pb.Iswinner);
+            if (winnersCount == 0 && drawnNumbers.Count == 3)
             {
-                winners = await ctx.Playerboards
-                    .Where(pb => pb.Boardid == b.Id)
-                    .Select(pb => pb.Playerboardnumbers.Select(n => n.Selectednumber))
-                    .CountAsync(nums => numbers.All(n => nums.Contains(n)));
+                bool anyNewWinners = false;
+                foreach (var pb in allPlayerBoards)
+                {
+                    var pbNums = pb.Playerboardnumbers.Select(n => n.Selectednumber).ToList();
+                    if (drawnNumbers.All(dn => pbNums.Contains(dn)))
+                    {
+                        pb.Iswinner = true; // Fix data on the fly
+                        winnersCount++;
+                        anyNewWinners = true;
+                    }
+                }
+                if (anyNewWinners) await ctx.SaveChangesAsync();
             }
 
-            result.Add(new GameHistoryDto
+            var dto = new GameHistoryDto
             {
                 BoardId = b.Id,
                 Week = b.Weeknumber,
                 Year = b.Year,
                 StartDate = b.Startdate,
                 EndDate = b.Enddate,
-                Numbers = numbers,
-                Participants = participantCount,
-                Winners = winners
-            });
+                Numbers = drawnNumbers,
+                Participants = allPlayerBoards.Count,
+                Winners = winnersCount
+            };
+
+            if (isAdmin && winnersCount > 0)
+            {
+                dto.WinnerDetails = allPlayerBoards
+                    .Where(pb => pb.Iswinner)
+                    .Select(pb => pb.Player)
+                    .DistinctBy(p => p.Id)
+                    .Select(p => new WinnerDetailDto
+                    {
+                        Name = p.Name,
+                        Email = p.Email,
+                        Phonenumber = p.Phonenumber
+                    }).ToList();
+            }
+
+            if (!string.IsNullOrEmpty(playerId))
+            {
+                var playerBoards = allPlayerBoards.Where(pb => pb.Playerid == playerId);
+                foreach (var pb in playerBoards)
+                {
+                    dto.PlayerBoards.Add(new PlayerBoardHistoryDto
+                    {
+                        Id = pb.Id,
+                        SelectedNumbers = pb.Playerboardnumbers.Select(n => n.Selectednumber).OrderBy(n => n).ToList(),
+                        IsWinner = pb.Iswinner
+                    });
+                }
+            }
+
+            result.Add(dto);
         }
 
         return result;
@@ -358,6 +406,21 @@ public class GameService(MyDbContext ctx, TimeProvider timeProvider, IPasswordHa
 
             active.Isactive = false;
             active.Enddate = now;
+
+            // Mark winners
+            var playerBoards = await ctx.Playerboards
+                .Include(pb => pb.Playerboardnumbers)
+                .Where(pb => pb.Boardid == active.Id)
+                .ToListAsync();
+
+            foreach (var pb in playerBoards)
+            {
+                var pbNums = pb.Playerboardnumbers.Select(n => n.Selectednumber).ToList();
+                if (distinct.All(dn => pbNums.Contains(dn)))
+                {
+                    pb.Iswinner = true;
+                }
+            }
 
             // Find next board by iso week/year ordering
             var next = await ctx.Boards

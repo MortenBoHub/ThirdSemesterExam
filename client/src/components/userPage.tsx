@@ -46,6 +46,8 @@ export default function UserView({ claims }: UserViewProps) {
     const [activeBoardLabel, setActiveBoardLabel] = useState<string>("Indlæser...");
     const [loading, setLoading] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
+    const [selectedHistory, setSelectedHistory] = useState<any | null>(null);
+    const [showHistoryDialog, setShowHistoryDialog] = useState(false);
 
     useEffect(() => {
         boardsApi.getActive().then(active => {
@@ -58,10 +60,10 @@ export default function UserView({ claims }: UserViewProps) {
             setActiveBoardLabel("Intet aktivt spil");
         });
 
-        boardsApi.getHistory(10).then(h => {
+        boardsApi.getHistory(10, claims.id).then(h => {
             setHistory(h);
         }).catch(() => {});
-    }, []);
+    }, [claims.id]);
 
     const handleNumberSelect = (boardId: number, num: number) => {
         setBoards(
@@ -383,36 +385,48 @@ export default function UserView({ claims }: UserViewProps) {
                             <p className="text-center text-gray-500 py-4">Ingen historik fundet</p>
                         ) : (
                             history.map((result, idx) => (
-                                <div
-                                    key={idx}
-                                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                                        result.winners > 0
-                                            ? 'bg-green-50 border-green-200'
-                                            : 'bg-gray-50 border-gray-200'
-                                    }`}
-                                >
-                                    <span className="text-sm">
-                                        Uge {result.week} {result.year}
-                                    </span>
-                                    <div className="flex items-center space-x-2">
-                                        <span className="text-sm">
-                                            Vindertal:
-                                        </span>
-                                        <div className="flex space-x-1">
-                                            {result.numbers.map((num: number) => (
-                                                <div
-                                                    key={num}
-                                                    className="w-8 h-8 rounded-md bg-[#ed1c24] text-white flex items-center justify-center text-xs"
-                                                >
-                                                    {num}
-                                                </div>
-                                            ))}
+                                <div key={idx} className="space-y-2 pb-2 border-b last:border-0">
+                                    <div
+                                        onClick={() => {
+                                            setSelectedHistory(result);
+                                            setShowHistoryDialog(true);
+                                        }}
+                                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all hover:border-[#ed1c24] ${
+                                            result.winners > 0
+                                                ? 'bg-green-50 border-green-200'
+                                                : 'bg-gray-50 border-gray-200'
+                                        }`}
+                                    >
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium">
+                                                Uge {result.week} {result.year}
+                                            </span>
+                                            {result.playerBoards && result.playerBoards.length > 0 && (
+                                                <span className="text-[10px] text-gray-500 italic">
+                                                    Du deltog med {result.playerBoards.length} bræt{result.playerBoards.length > 1 ? 'ter' : ''}
+                                                </span>
+                                            )}
                                         </div>
-                                        {result.winners > 0 && (
-                                            <Badge className="bg-green-600 text-white ml-2">
-                                                Vindere fundet!
-                                            </Badge>
-                                        )}
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-sm">
+                                                Vindertal:
+                                            </span>
+                                            <div className="flex space-x-1">
+                                                {result.numbers.map((num: number) => (
+                                                    <div
+                                                        key={num}
+                                                        className="w-8 h-8 rounded-md bg-[#ed1c24] text-white flex items-center justify-center text-xs"
+                                                    >
+                                                        {num}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {result.winners > 0 && (
+                                                <Badge className="bg-green-600 text-white ml-2">
+                                                    Vindere fundet!
+                                                </Badge>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ))
@@ -470,6 +484,84 @@ export default function UserView({ claims }: UserViewProps) {
                     </DialogContent>
                 </Dialog>
             )}
+
+            {/* History Details Dialog */}
+            <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+                <DialogContent className="max-w-md bg-white">
+                    <DialogHeader>
+                        <DialogTitle className="text-[#ed1c24]">
+                            Detaljer for Uge {selectedHistory?.week} {selectedHistory?.year}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Se dine valgte numre og ugens vindertal.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="py-4 space-y-6">
+                        {/* Winning Numbers */}
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-gray-700">Ugens vindertal:</h4>
+                            <div className="flex space-x-2">
+                                {selectedHistory?.numbers.map((num: number) => (
+                                    <div
+                                        key={num}
+                                        className="w-10 h-10 rounded-lg bg-[#ed1c24] text-white flex items-center justify-center text-lg font-bold shadow-md"
+                                    >
+                                        {num}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Player's Boards */}
+                        <div className="space-y-3">
+                            <h4 className="text-sm font-medium text-gray-700">Dine brætter:</h4>
+                            {selectedHistory?.playerBoards && selectedHistory.playerBoards.length > 0 ? (
+                                <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+                                    {selectedHistory.playerBoards.map((pb: any, idx: number) => (
+                                        <div key={pb.id} className="p-4 border rounded-lg bg-gray-50 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-sm font-medium">Bræt {idx + 1}</span>
+                                                {pb.isWinner && (
+                                                    <Badge className="bg-amber-500 text-white">VINDER!</Badge>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {pb.selectedNumbers.map((num: number) => {
+                                                    const isMatch = selectedHistory.numbers.includes(num);
+                                                    return (
+                                                        <div
+                                                            key={num}
+                                                            className={`w-8 h-8 rounded-md flex items-center justify-center text-sm ${
+                                                                isMatch
+                                                                    ? 'bg-green-600 text-white font-bold'
+                                                                    : 'bg-white border-2 border-gray-200 text-gray-600'
+                                                            }`}
+                                                        >
+                                                            {num}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-500 italic">Du deltog ikke i denne uge.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            onClick={() => setShowHistoryDialog(false)}
+                            className="w-full bg-[#ed1c24] hover:bg-[#d11920]"
+                        >
+                            Luk
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -17,9 +17,8 @@ public class FundRequestsController(
     ISieveProcessor sieve,
     MyDbContext ctx) : ControllerBase
 {
-    /// <summary>
-    /// Player creates a fund request for adding money to their account
-    /// </summary>
+    
+    // Player creates a fund request for adding money to their account
     [Authorize(Roles = "User")]
     [HttpPost]
     public async Task<ActionResult<object>> Create([FromBody] CreateFundRequestDto dto)

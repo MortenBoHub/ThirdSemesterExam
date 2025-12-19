@@ -32,9 +32,24 @@ public class BoardsController(IGameService gameService, IAuthService authService
     }
 
     [HttpGet("history")]
-    public async Task<List<GameHistoryDto>> GetHistory([FromQuery] int take = 10)
+    public async Task<List<GameHistoryDto>> GetHistory([FromQuery] int take = 10, [FromQuery] string? playerId = null)
     {
-        return await gameService.GetGameHistory(take);
+        bool isAdmin = false;
+        try
+        {
+            var authHeader = Request.Headers.Authorization.FirstOrDefault();
+            if (!string.IsNullOrEmpty(authHeader))
+            {
+                var jwt = await authService.VerifyAndDecodeToken(authHeader);
+                isAdmin = string.Equals(jwt.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        catch
+        {
+            // Not logged in or invalid token, continue as non-admin
+        }
+        
+        return await gameService.GetGameHistory(take, playerId, isAdmin);
     }
 
     [Authorize(Roles = "Admin")]

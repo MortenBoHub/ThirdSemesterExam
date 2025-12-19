@@ -20,7 +20,7 @@ export const customFetch = {
             ...init,
             headers
         }).then(async (response) => {
-            // Handle errors by reading from one clone
+            // Handle errors by reading from a clone
             if (!response.ok) {
                 const errorClone = response.clone();
                 const problemDetails = (await errorClone.json()) as ProblemDetails;

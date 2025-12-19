@@ -329,6 +329,8 @@ public class GameServiceTests
     [Fact]
     public async Task Board_Management_Activate_Deactivate_GetActive_GetRecent()
     {
+        var admin = new Admin { Id = Guid.NewGuid().ToString(), Email = "a@a.dk", Name = "A", Passwordhash = "x", Phonenumber = "123456" };
+        _context.Admins.Add(admin);
         var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
         var b1 = new Board { Id = Guid.NewGuid().ToString(), Year = 2025, Weeknumber = 1, Isactive = false, Createdat = now, Startdate = now, Enddate = now.AddDays(6) };
         var b2 = new Board { Id = Guid.NewGuid().ToString(), Year = 2025, Weeknumber = 2, Isactive = false, Createdat = now, Startdate = now.AddDays(7), Enddate = now.AddDays(13) };
@@ -342,6 +344,11 @@ public class GameServiceTests
         await _gameService.DeactivateBoard(b1.Id);
         active = await _gameService.GetActiveBoard();
         Assert.Null(active);
+
+        // Add drawn numbers so they show up in GetRecentBoards (which is now filtered for history)
+        _context.Drawnnumbers.Add(new Drawnnumber { Id = Guid.NewGuid().ToString(), Boardid = b1.Id, Drawnnumber1 = 1, Drawnat = now, Drawnby = admin.Id });
+        _context.Drawnnumbers.Add(new Drawnnumber { Id = Guid.NewGuid().ToString(), Boardid = b2.Id, Drawnnumber1 = 2, Drawnat = now, Drawnby = admin.Id });
+        await _context.SaveChangesAsync();
 
         var recent = await _gameService.GetRecentBoards(10);
         Assert.Contains(recent, b => b.Id == b1.Id);
@@ -399,6 +406,79 @@ public class GameServiceTests
         Assert.NotEmpty(history);
         var historyEntry = history.First(h => h.BoardId == b1.Id);
         Assert.Equal(2, historyEntry.Winners);
+
+        // NEW: Check if Iswinner is persisted in DB
+        var persistedWinner = await _context.Playerboards.FirstAsync(pb => pb.Playerid == p1.Id && pb.Boardid == b1.Id);
+        Assert.True(persistedWinner.Iswinner);
+    }
+
+    [Fact]
+    public async Task GetGameHistory_Filtering_And_Personalization_Test()
+    {
+        var admin = new Admin { Id = Guid.NewGuid().ToString(), Email = "a@a.dk", Name = "A", Passwordhash = "x", Phonenumber = "123456" };
+        _context.Admins.Add(admin);
+
+        var player = await _gameService.CreatePlayer(new CreatePlayerRequestDto { Name = "P", Email = "p@a.dk", PhoneNumber = "123456", Password = "Password123!" });
+        player.Funds = 1000m;
+        await _context.SaveChangesAsync();
+
+        var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
+        // B1: Completed (has drawn numbers)
+        var b1 = new Board { Id = "B1", Year = 2025, Weeknumber = 1, Isactive = true, Createdat = now };
+        // B2: Future
+        var b2 = new Board { Id = "B2", Year = 2025, Weeknumber = 2, Isactive = false, Createdat = now };
+        _context.Boards.AddRange(b1, b2);
+        await _context.SaveChangesAsync();
+
+        await _gameService.CreatePlayerBoards(player.Id, new CreatePlayerBoardsRequestDto { SelectedNumbers = new() { 1, 2, 3, 4, 5 }, RepeatWeeks = 2 });
+
+        // Draw for B1
+        await _gameService.DrawWinningNumbersAndAdvance(admin.Id, new[] { 1, 2, 3 });
+
+        // Get history without player
+        var historyGeneral = await _gameService.GetGameHistory();
+        Assert.Single(historyGeneral); // Only B1 should show up
+        Assert.Equal("B1", historyGeneral[0].BoardId);
+        Assert.Empty(historyGeneral[0].PlayerBoards);
+
+        // Get history with player
+        var historyPersonal = await _gameService.GetGameHistory(10, player.Id);
+        Assert.Single(historyPersonal);
+        Assert.Single(historyPersonal[0].PlayerBoards);
+        Assert.True(historyPersonal[0].PlayerBoards[0].IsWinner);
+        Assert.Equal(new[] { 1, 2, 3, 4, 5 }, historyPersonal[0].PlayerBoards[0].SelectedNumbers.ToArray());
+    }
+
+    [Fact]
+    public async Task GetGameHistory_Admin_Sees_WinnerDetails()
+    {
+        var admin = new Admin { Id = Guid.NewGuid().ToString(), Email = "a@a.dk", Name = "A", Passwordhash = "x", Phonenumber = "123456" };
+        _context.Admins.Add(admin);
+
+        var player = await _gameService.CreatePlayer(new CreatePlayerRequestDto { Name = "Winner Player", Email = "winner@a.dk", PhoneNumber = "99999999", Password = "Password123!" });
+        player.Funds = 1000m;
+        await _context.SaveChangesAsync();
+
+        var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
+        var b1 = new Board { Id = "B1", Year = 2025, Weeknumber = 1, Isactive = true, Createdat = now };
+        _context.Boards.Add(b1);
+        await _context.SaveChangesAsync();
+
+        await _gameService.CreatePlayerBoards(player.Id, new CreatePlayerBoardsRequestDto { SelectedNumbers = new() { 1, 2, 3, 4, 5 }, RepeatWeeks = 1 });
+
+        // Draw for B1
+        await _gameService.DrawWinningNumbersAndAdvance(admin.Id, new[] { 1, 2, 3 });
+
+        // Get history as admin
+        var historyAdmin = await _gameService.GetGameHistory(10, null, true);
+        Assert.Single(historyAdmin);
+        Assert.Single(historyAdmin[0].WinnerDetails);
+        Assert.Equal("Winner Player", historyAdmin[0].WinnerDetails[0].Name);
+        Assert.Equal("99999999", historyAdmin[0].WinnerDetails[0].Phonenumber);
+
+        // Get history NOT as admin
+        var historyUser = await _gameService.GetGameHistory(10, null, false);
+        Assert.Empty(historyUser[0].WinnerDetails);
     }
 
     [Fact]
@@ -420,6 +500,54 @@ public class GameServiceTests
 
         var board01 = await _context.Boards.FirstAsync(b => b.Id == "2026-01");
         Assert.True(board01.Isactive);
+    }
+
+    [Fact]
+    public async Task GetGameHistory_BackwardCompatibility_Calculates_Winners()
+    {
+        var admin = new Admin { Id = Guid.NewGuid().ToString(), Email = "a@a.dk", Name = "A", Passwordhash = "x", Phonenumber = "123456" };
+        _context.Admins.Add(admin);
+
+        var player = await _gameService.CreatePlayer(new CreatePlayerRequestDto { Name = "Old Winner", Email = "old@a.dk", PhoneNumber = "123456", Password = "Password123!" });
+        player.Funds = 1000m;
+        await _context.SaveChangesAsync();
+
+        var now = _fakeTimeProvider.GetUtcNow().UtcDateTime;
+        // Board with NO endDate and NO isWinner set, but HAS drawn numbers
+        var b1 = new Board { Id = "OldBoard", Year = 2025, Weeknumber = 1, Isactive = false, Createdat = now };
+        _context.Boards.Add(b1);
+        await _context.SaveChangesAsync();
+
+        // Create player board but do NOT mark as winner
+        var pb = new Playerboard { Id = "PB1", Boardid = b1.Id, Playerid = player.Id, Createdat = now, Iswinner = false };
+        _context.Playerboards.Add(pb);
+        _context.Playerboardnumbers.AddRange(
+            new Playerboardnumber { Id = "N1", Playerboardid = "PB1", Selectednumber = 1 },
+            new Playerboardnumber { Id = "N2", Playerboardid = "PB1", Selectednumber = 2 },
+            new Playerboardnumber { Id = "N3", Playerboardid = "PB1", Selectednumber = 3 },
+            new Playerboardnumber { Id = "N4", Playerboardid = "PB1", Selectednumber = 4 },
+            new Playerboardnumber { Id = "N5", Playerboardid = "PB1", Selectednumber = 5 }
+        );
+
+        // Add drawn numbers manually to simulate old data
+        _context.Drawnnumbers.AddRange(
+            new Drawnnumber { Id = "D1", Boardid = b1.Id, Drawnnumber1 = 1, Drawnat = now, Drawnby = admin.Id },
+            new Drawnnumber { Id = "D2", Boardid = b1.Id, Drawnnumber1 = 2, Drawnat = now, Drawnby = admin.Id },
+            new Drawnnumber { Id = "D3", Boardid = b1.Id, Drawnnumber1 = 3, Drawnat = now, Drawnby = admin.Id }
+        );
+        await _context.SaveChangesAsync();
+
+        // Get history as admin
+        var history = await _gameService.GetGameHistory(10, null, true);
+        
+        Assert.Single(history);
+        Assert.Equal(1, history[0].Winners); // Should be calculated!
+        Assert.Single(history[0].WinnerDetails);
+        Assert.Equal("Old Winner", history[0].WinnerDetails[0].Name);
+
+        // Verify it was persisted back to DB
+        var updatedPb = await _context.Playerboards.FirstAsync(x => x.Id == "PB1");
+        Assert.True(updatedPb.Iswinner);
     }
 
     [Fact]
